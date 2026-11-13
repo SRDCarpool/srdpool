@@ -4,6 +4,7 @@ import { Header, Icon, Chip, Stepper, Segmented, useNav } from '../ui';
 import { fmtDay, fmtTime, rupee } from '../geo';
 import { useFares } from './find';
 import { useT } from '../i18n';
+import { VerifyPrompt, isVerifiedOrPending } from './verify';
 
 const nextSlot = () => {
   const d = new Date(Date.now() + 45 * 60000);
@@ -57,7 +58,7 @@ export default function PostRide() {
     [n[i], n[j]] = [n[j], n[i]];
     setPoints(n);
   };
-  const valid = v && start.trim().length >= 2 && dest.trim().length >= 2 && time;
+  const valid = v && isVerifiedOrPending(state) && start.trim().length >= 2 && dest.trim().length >= 2 && time;
 
   const submit = async () => {
     setErr(null);
@@ -76,6 +77,7 @@ export default function PostRide() {
     <div className="screen">
       <Header title={t('offerRide')} sub="Sangareddy / Isnapur → Financial District / HITEC City" back={nav.depth > 1} />
 
+      {!isVerifiedOrPending(state) && <div style={{ marginBottom: 12 }}><VerifyPrompt compact /></div>}
       {!v ? (
         <button className="card" style={{ textAlign: 'left', marginBottom: 12 }} onClick={() => nav.go('page', { page: 'vehicle' })}>
           <div className="hstack">

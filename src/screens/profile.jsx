@@ -5,6 +5,7 @@ import { LANGS, useT } from '../i18n';
 import { VEHICLE_TYPES } from '../data';
 import { fmtDay, rupee } from '../geo';
 import { resizePhoto } from './auth';
+import { WorkVerify } from './verify';
 
 export function Profile() {
   const { state, setRole, logout, updateMe } = useStore();
@@ -49,6 +50,7 @@ export function Profile() {
       </div>
 
       <div className="card menu" style={{ marginTop: 16 }}>
+        <Row icon="shield" title="Verification" sub={state.me.work?.company ? `${state.me.work.designation} · ${state.me.work.company}` : 'Company details & ID card'} onClick={() => go('verify')} right={<span className={'badge sm ' + ({ verified: 'green', pending: 'gold', rejected: 'red' }[state.me.work?.status] || 'gray')}>{{ verified: 'Verified', pending: 'Under review', rejected: 'Action needed' }[state.me.work?.status] || 'Not done'}</span>} />
         <Row icon="user" title="Edit profile" sub="Name, age, bio, contact" onClick={() => go('edit')} />
         <Row icon="car" title="Vehicle & verification" sub={state.me.vehicle ? `${state.me.vehicle.brand} ${state.me.vehicle.model}` : 'Required to offer rides'} onClick={() => go('vehicle')} right={<span className={'badge sm ' + ver[1]}>{ver[0]}</span>} />
         <Row icon="heart" title="Favourite members" sub={`${state.favorites.length} favourites`} onClick={() => go('favorites')} />
@@ -77,7 +79,7 @@ export function Profile() {
 }
 
 export function ProfilePage({ page }) {
-  const P = { edit: EditProfile, vehicle: Vehicle, favorites: Favorites, alerts: Alerts, emergency: Emergency, privacy: Privacy, guidelines: Guidelines, payments: Payments, notifs: Notifs, language: Language, help: Help }[page];
+  const P = { verify: WorkVerify, edit: EditProfile, vehicle: Vehicle, favorites: Favorites, alerts: Alerts, emergency: Emergency, privacy: Privacy, guidelines: Guidelines, payments: Payments, notifs: Notifs, language: Language, help: Help }[page];
   return <div className="screen no-tab"><P /></div>;
 }
 

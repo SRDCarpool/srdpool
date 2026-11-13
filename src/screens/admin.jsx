@@ -22,7 +22,7 @@ export default function Admin() {
     <div className="screen no-tab">
       <Header title="Admin dashboard" sub="Saathi operations" right={<button className="icon-btn" onClick={() => setTick((x) => x + 1)} aria-label="Refresh"><Icon name="repeat" size={19} /></button>} />
       <div className="hscroll" style={{ marginBottom: 12 }}>
-        <Segmented value={tab} onChange={setTab} options={[['overview', 'Overview'], ['verify', `Verify (${d.queue.length})`], ['reports', `Reports (${openReports})`], ['users', 'Users'], ['rides', 'Rides'], ['audit', 'Audit log']]} />
+        <Segmented value={tab} onChange={setTab} options={[['overview', 'Overview'], ['verify', `Verify (${d.queue.length + d.workQueue.length})`], ['reports', `Reports (${openReports})`], ['users', 'Users'], ['rides', 'Rides'], ['audit', 'Audit log']]} />
       </div>
 
       {tab === 'overview' && (
@@ -52,6 +52,28 @@ export default function Admin() {
         </>
       )}
 
+      {tab === 'verify' && d.workQueue.length > 0 && (
+        <div className="stack" style={{ marginBottom: 12 }}>
+          <b>Member verification</b>
+          {d.workQueue.map((u) => (
+            <div key={u.id} className="card">
+              <div className="hstack"><Avatar user={u} size={44} /><div className="grow"><b>{u.name}</b><small style={{ display: 'block' }}>Submitted {u.work.submittedAt ? timeAgo(u.work.submittedAt) : 'earlier'}</small></div></div>
+              <div className="divider" />
+              <div className="kv"><span>Company</span><b>{u.work.company}</b></div>
+              <div className="kv"><span>Place of work</span><b>{u.work.workplace}</b></div>
+              <div className="kv"><span>Designation</span><b>{u.work.designation}</b></div>
+              <div className="kv"><span>Joining as</span><b>{{ taker: 'Ride Taker', giver: 'Ride Giver', both: 'Giver & Taker' }[u.work.roles]}</b></div>
+              {u.idImage ? <img src={u.idImage} alt={`ID card of ${u.name}`} style={{ width: '100%', borderRadius: 12, marginTop: 8, border: '1px solid var(--line)' }} /> : <p className="muted">No ID image</p>}
+              <small style={{ display: 'block', marginTop: 6 }}><Icon name="lock" size={12} /> The ID card picture is deleted as soon as you approve or reject.</small>
+              <div className="btn-row" style={{ marginTop: 12 }}>
+                <button className="btn danger-ghost" onClick={() => act(`/admin/work/${u.id}`, { approve: false }, 'Rejected · ID card deleted')}>Reject</button>
+                <button className="btn" onClick={() => act(`/admin/work/${u.id}`, { approve: true }, 'Verified · ID card deleted')}><Icon name="check" /> Approve</button>
+              </div>
+            </div>
+          ))}
+          {d.queue.length > 0 && <b style={{ marginTop: 8 }}>Driver & vehicle</b>}
+        </div>
+      )}
       {tab === 'verify' && (d.queue.length ? (
         <div className="stack">
           {d.queue.map((u) => (
@@ -68,7 +90,7 @@ export default function Admin() {
             </div>
           ))}
         </div>
-      ) : <div className="card"><Empty icon="shield" title="No pending verifications" /></div>)}
+      ) : !d.workQueue.length && <div className="card"><Empty icon="shield" title="No pending verifications" /></div>)}
 
       {tab === 'reports' && (
         <div className="stack">

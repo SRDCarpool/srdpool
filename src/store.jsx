@@ -188,6 +188,15 @@ export function StoreProvider({ children }) {
       }),
       block: (userId) => run(() => post(`/me/blocked/${userId}`), "Member blocked — you won't see each other's rides"),
       unblock: (userId) => run(() => post(`/me/blocked/${userId}`)),
+      submitWork: async (data) => {
+        try {
+          await post('/me/work-verification', data);
+          refresh();
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: e.message };
+        }
+      },
       submitVehicle: (vehicle, licence) => run(() => post('/me/vehicle', { vehicle, licence })),
       joinCommunity: (id) => run(() => post(`/me/communities/${id}`, { join: true }), 'Community joined ✅'),
       leaveCommunity: (id) => run(() => post(`/me/communities/${id}`, { join: false })),

@@ -3,6 +3,7 @@ import { useStore, useAsync, getUser, myBooking, seatsLeft, rideById } from '../
 import { Header, Icon, Chip, Segmented, Stepper, Sheet, RideCard, Empty, Avatar, Badges, MapView, StatusSteps, RouteLine, VIA, useNav } from '../ui';
 import { fmtTime, fmtDay, first, rupee, etaMin, km, distKm } from '../geo';
 import { useT } from '../i18n';
+import { isVerifiedOrPending } from './verify';
 
 const dayTs = (offset) => {
   const d = new Date();
@@ -294,7 +295,9 @@ export function RideDetail({ rideId, origin: originParam, pickupIdx: pIdx }) {
               <input className="input" placeholder="Note for the driver (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
               <div className="hstack">
                 <Stepper value={seats} onChange={setSeats} max={Math.max(1, Math.min(4, left))} />
-                <button className="btn grow" disabled={busy} onClick={doBook}>{t('request')} · {rupee(fare * seats)}</button>
+                {isVerifiedOrPending(state)
+                  ? <button className="btn grow" disabled={busy} onClick={doBook}>{t('request')} · {rupee(fare * seats)}</button>
+                  : <button className="btn grow" onClick={() => nav.go('page', { page: 'verify' })}><Icon name="shield" /> Verify yourself to book</button>}
               </div>
             </div>
           ) : onWait ? (

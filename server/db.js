@@ -63,3 +63,5 @@ export const Payments = table('payments', ['userId']);
 export const Alerts = table('alerts', ['userId']);
 export const Audit = table('audit', ['at']);
 export const GeoCache = table('geocache');
+// ID card images live apart from user records and are deleted once reviewed.
+export const IdCards = table('idcards', ['userId']);

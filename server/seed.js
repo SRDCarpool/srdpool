@@ -4,6 +4,8 @@ import { Users, Rides, Bookings, Reports, uid } from './db.js';
 import { FARES, placeStops, rideShape } from './corridors.js';
 import { newUser } from './engine.js';
 
+const COMPANY = { u_ravi: 'Wipro', u_priya: 'Microsoft', u_arjun: 'ICICI Bank', u_sneha: 'Wipro', u_vikram: 'Deloitte', u_ananya: 'Amazon', u_kiran: 'Infosys', u_meera: 'TCS', u_rahul: 'HCL' };
+
 const BOTS = [
   ['u_ravi', 'Ravi Kumar', 34, '#2563EB', 4.8, 126, { ridesGiven: 142, cancellations: 2 }, true, 'Software engineer. Daily commute Sangareddy → HITEC City via ORR. Punctual & calm driver.', { brand: 'Maruti', model: 'Swift Dzire', color: 'White', reg: 'TS 09 EK 4521', type: 'Sedan' }],
   ['u_priya', 'Priya Sharma', 29, '#DB2777', 4.9, 88, { ridesGiven: 95, cancellations: 1 }, true, 'Product designer. Uses the quieter Shankarpally route.', { brand: 'Honda', model: 'City', color: 'Silver', reg: 'TS 08 GH 7712', type: 'Sedan' }],
@@ -18,10 +20,15 @@ const BOTS = [
 
 function ensureBots() {
   for (const [id, name, age, color, avg, count, stats, trusted, bio, vehicle] of BOTS) {
-    if (Users.get(id)) continue;
+    const existing = Users.get(id);
+    if (existing) {
+      if (!existing.work) Users.save({ ...existing, work: { status: 'verified', company: COMPANY[id] || 'Infosys', workplace: 'Financial District', designation: 'Engineer', roles: vehicle ? 'giver' : 'taker' } });
+      continue;
+    }
     Users.insert({
       ...newUser('bot:' + id), id, isBot: true, name, age, color, bio, vehicle, trusted, stats: { ridesGiven: 0, ridesTaken: 0, ...stats },
       verification: id === 'u_ananya' || !vehicle ? (vehicle ? 'pending' : 'verified') : 'verified', ratingSeed: { avg, count }, joined: 'Mar 2024',
+      work: { status: 'verified', company: COMPANY[id] || 'Infosys', workplace: 'Financial District', designation: 'Engineer', roles: vehicle ? 'giver' : 'taker' },
     });
   }
   if (!Reports.count()) {

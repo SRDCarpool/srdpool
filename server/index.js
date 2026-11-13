@@ -3,7 +3,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import express from 'express';
-import { Users, Sessions, Otps, Rides, Bookings, Reports, Audit, Alerts, Notifications, sha } from './db.js';
+import { Users, Sessions, Otps, Rides, Bookings, Reports, Audit, Alerts, Notifications, IdCards, sha } from './db.js';
 import * as E from './engine.js';
 import { buildState, meify } from './state.js';
 import { attachRealtime, sync } from './realtime.js';
@@ -30,7 +30,7 @@ const h = (fn) => async (req, res) => {
   } catch (e) {
     const status = e.status || 500;
     if (status === 500) console.error(e);
-    res.status(status).json({ error: status === 500 ? 'Something went wrong. Please try again.' : e.message, conflictId: e.conflictId });
+    res.status(status).json({ error: status === 500 ? 'Something went wrong. Please try again.' : e.message, conflictId: e.conflictId, code: e.code });
   }
 };
 const idOf = (req, x) => (x === 'me' ? req.user.id : x);
@@ -179,6 +179,7 @@ app.post('/api/me/vehicle', h((req) => {
   Users.save(u);
   E.notify(u.id, { type: 'system', title: 'Submitted for verification', body: 'Usually approved within 24 hours' });
 }));
+app.post('/api/me/work-verification', h((req) => E.submitWork(req.user.id, req.body)));
 app.post('/api/me/communities/:id', h((req) => {
   if (!COMMUNITIES.includes(req.params.id)) throw new E.HttpError(404, 'Unknown community');
   const u = req.user;
@@ -287,17 +288,19 @@ app.get('/api/admin/overview', admin, h(() => {
     counts: {
       users: users.length, active: rides.filter((r) => r.status === 'started').length, upcoming: scheduled.length,
       completed: rides.filter((r) => r.status === 'completed').length, cancelled: rides.filter((r) => r.status === 'cancelled').length,
-      openReports: Reports.count('status = \'open\''), pending: users.filter((u) => u.verification === 'pending').length,
+      openReports: Reports.count('status = \'open\''), pending: users.filter((u) => u.verification === 'pending').length + users.filter((u) => u.work?.status === 'pending').length,
       avgSeats: scheduled.length ? +(scheduled.reduce((a, r) => a + (r.seats - E.seatsLeft(r)), 0) / scheduled.length).toFixed(1) : 0,
     },
     week, dups,
     queue: users.filter((u) => u.verification === 'pending').map((u) => ({ ...E.publicUser(u), vehicleFull: u.vehicle, licence: u.licence ? u.licence.slice(0, 4) + '••••' + u.licence.slice(-3) : '', at: u.verificationAt })),
+    workQueue: users.filter((u) => u.work?.status === 'pending').map((u) => ({ ...E.publicUser(u), work: u.work, idImage: IdCards.where('"userId" = ?', u.id)[0]?.image || null })),
     reports: Reports.where('1=1 ORDER BY at DESC').map((r) => ({ ...r, byName: name(r.byId), targetName: name(r.targetId) })),
     users: users.map((u) => ({ ...E.publicUser(u), phone: u.isBot ? 'demo member' : u.phone.slice(0, 6) + '•••••' + u.phone.slice(-2), isBot: u.isBot, isDriver: !!u.vehicle })),
     rides: rides.sort((a, b) => b.time - a.time).slice(0, 40).map((r) => ({ id: r.id, from: r.stops[0].name, to: r.stops.at(-1).name, time: r.time, price: r.price, status: status(r), driver: name(r.driverId) })),
     audit: Audit.where('1=1 ORDER BY at DESC LIMIT 100').map((a) => ({ ...a, adminName: name(a.adminId) })),
   };
 }));
+app.post('/api/admin/work/:userId', admin, h((req) => E.adminWork(req.user.id, idOf(req, req.params.userId), !!req.body.approve)));
 app.post('/api/admin/verify/:userId', admin, h((req) => E.adminVerify(req.user.id, idOf(req, req.params.userId), !!req.body.approve)));
 app.post('/api/admin/suspend/:userId', admin, h((req) => E.adminSuspend(req.user.id, idOf(req, req.params.userId))));
 app.post('/api/admin/reports/:id', admin, h((req) => E.adminReport(req.user.id, req.params.id, req.body.outcome)));

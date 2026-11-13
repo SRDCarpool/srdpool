@@ -1,6 +1,6 @@
 // Core business logic. Every mutation persists to SQLite, writes notifications,
 // and pushes realtime updates to the affected users.
-import { Users, Rides, Bookings, Messages, Notifications, Reports, Payments, Alerts, Audit, uid } from './db.js';
+import { Users, Rides, Bookings, Messages, Notifications, Reports, Payments, Alerts, Audit, IdCards, uid } from './db.js';
 import { send, sync } from './realtime.js';
 import { project, pointAt, etaMin } from './geo.js';
 import { CORRIDORS, ORIGINS, FARES, placeStops, servesOrigin, suggestPickup, rideShape, geomOf } from './corridors.js';
@@ -27,7 +27,7 @@ export function newUser(phone) {
   return {
     id: uid('u_'), phone, isBot: false, isAdmin: false, name: '', age: '', gender: '', photo: null, bio: '', email: '',
     role: 'taker', color: colors[Math.floor(Math.random() * colors.length)], verification: 'none', vehicle: null, licence: '',
-    ratingSeed: { avg: 0, count: 0 }, createdAt: Date.now(), joined: new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }),
+    work: { status: 'none' }, ratingSeed: { avg: 0, count: 0 }, createdAt: Date.now(), joined: new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }),
     lastPostAt: null, suspended: false,
     data: { favorites: [], blocked: [], emergency: [], savedPlaces: [], savedRoutes: [], recentSearches: [], commute: null, holidayMode: false, communities: [], subscriptions: [] },
     prefs: { notif: { bookings: true, chat: true, matches: true, reminders: true, favorites: true }, shareLocation: true, showPhone: false },
@@ -54,6 +54,7 @@ export function publicUser(u) {
     vehicle: u.vehicle ? { brand: u.vehicle.brand, model: u.vehicle.model, color: u.vehicle.color, type: u.vehicle.type } : null,
     ridesGiven: st.ridesGiven, ridesTaken: st.ridesTaken, cancellations: st.cancellations, completed: st.completed, cancelRate: st.cancelRate,
     suspended: !!u.suspended, demo: !!u.isBot,
+    workVerified: u.work?.status === 'verified', company: u.work?.status === 'verified' ? u.work.company : null,
   };
 }
 
@@ -113,6 +114,7 @@ const cleanText = (s, max = 60) => String(s || '').replace(/\s+/g, ' ').trim().s
 
 export async function postRide(userId, b) {
   const user = Users.get(userId);
+  requireWorkDetails(user);
   if (!user.vehicle) throw bad('Add your vehicle before offering a ride');
   const start = cleanText(b.start), dest = cleanText(b.destination);
   const points = (Array.isArray(b.points) ? b.points : []).map((p) => cleanText(p, 40)).filter(Boolean).slice(0, 10);
@@ -375,6 +377,7 @@ export function book(userId, rideId, { pickupIdx, dropIdx, seats = 1, note = '',
   const ride = getRide(rideId);
   const user = Users.get(userId);
   const driver = Users.get(ride.driverId);
+  if (!user.isBot) requireWorkDetails(user);
   if (ride.driverId === userId) throw bad("You can't book your own ride");
   if (ride.status !== 'scheduled' || isExpired(ride)) throw bad('This ride is no longer available');
   if (driver.suspended || user.data.blocked.includes(ride.driverId) || driver.data?.blocked?.includes(userId)) throw bad('This ride is not available');
@@ -611,6 +614,49 @@ export function housekeeping() {
       if (!u.data.holidayMode) notify(b.passengerId, { type: 'reminder', title: `Ride with ${first(driver.name)} in ${mins} min`, body: `Be at ${ride.stops[b.pickupIdx].name} by ${fmtTime(ride.time)}`, rideId: ride.id });
     });
   }
+}
+
+/* ---------------- work verification ---------------- */
+const WORK_STATUS_OK = ['pending', 'verified'];
+function requireWorkDetails(user) {
+  if (!WORK_STATUS_OK.includes(user.work?.status)) {
+    const e = bad('Please verify yourself first (company details and ID card)');
+    e.code = 'VERIFY_REQUIRED';
+    throw e;
+  }
+}
+
+export function submitWork(userId, b) {
+  const u = Users.get(userId);
+  const t = (s, max = 60) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, max);
+  const name = t(b.name), company = t(b.company), workplace = t(b.workplace), designation = t(b.designation);
+  if (name.length < 2) throw bad('Enter your full name');
+  if (company.length < 2) throw bad('Enter your company name');
+  if (workplace.length < 2) throw bad('Enter your place of work');
+  if (designation.length < 2) throw bad('Enter your designation');
+  if (!['taker', 'giver', 'both'].includes(b.roles)) throw bad('Choose Ride Giver, Ride Taker or both');
+  if (!/^data:image\/(jpeg|png|webp);base64,/.test(b.idImage || '')) throw bad('Add a clear photo of your ID card');
+  if (b.idImage.length > 2_500_000) throw bad('ID card photo is too large');
+  IdCards.where('"userId" = ?', userId).forEach((c) => IdCards.remove(c.id));
+  IdCards.insert({ id: uid('id_'), userId, image: b.idImage, at: Date.now() });
+  u.name = name;
+  u.work = { status: 'pending', company, workplace, designation, roles: b.roles, submittedAt: Date.now() };
+  if (b.roles !== 'both') u.role = b.roles;
+  Users.save(u);
+  notify(userId, { type: 'system', title: 'Details submitted for verification', body: 'Your ID card photo is deleted as soon as it is reviewed' });
+}
+
+export function adminWork(adminId, userId, approve) {
+  const u = Users.get(userId);
+  if (!u || u.work?.status !== 'pending') throw bad('Nothing to verify');
+  u.work = { ...u.work, status: approve ? 'verified' : 'rejected', reviewedAt: Date.now() };
+  Users.save(u);
+  const cards = IdCards.where('"userId" = ?', userId);
+  cards.forEach((c) => IdCards.remove(c.id));
+  audit(adminId, `${approve ? 'Approved' : 'Rejected'} work verification · ID card deleted`, u.name);
+  notify(userId, approve
+    ? { type: 'system', title: 'You are verified ✅', body: `${u.work.company} · your ID card photo has been deleted` }
+    : { type: 'system', title: 'Verification not approved', body: 'Your ID card photo has been deleted. Please resubmit with a clear photo.' });
 }
 
 /* ---------------- admin ---------------- */

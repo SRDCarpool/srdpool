@@ -161,7 +161,8 @@ export function SlideToConfirm({ label, onConfirm, tone = 'primary', disabled })
 export function Badges({ user, small }) {
   return (
     <>
-      {user.verified && <span className={'badge green' + (small ? ' sm' : '')}><Icon name="shield" size={12} /> Verified</span>}
+      {user.workVerified && <span className={'badge blue' + (small ? ' sm' : '')}>🏢 {user.company || 'Work verified'}</span>}
+      {user.verified && <span className={'badge green' + (small ? ' sm' : '')}><Icon name="shield" size={12} /> Verified driver</span>}
       {user.trusted && <span className={'badge gold' + (small ? ' sm' : '')}>★ Trusted</span>}
     </>
   );

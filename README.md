@@ -8,7 +8,13 @@ A friendly, mobile-first carpooling app for one commuter corridor:
 | Fixed routes and fixed fares only: **Sangareddy ₹150**, **Isnapur ₹120** per seat. Destination is always Financial District / HITEC City | A simple form: starting point, destination, date, time, seats, then **pickup points** in order. Passengers see it as one line, e.g. `9:00 AM Malkapur Chintal › SRD X Road › ORR › ICICI › Wipro Circle` |
 | Route choice from Sangareddy: **Via Isnapur & ORR** or the alternative **Via Shankarpally**. Isnapur riders always use the ORR route | The app detects the route (ORR or Shankarpally) and starting area (Sangareddy or Isnapur) from what they type; they can correct it with one tap |
 
-There is no rating system. Trust comes from OTP-verified phones, driver/vehicle verification, ride counts, cancellations and a reliability score.
+There is no rating system. Trust comes from OTP-verified phones, member verification, driver/vehicle verification, ride counts, cancellations and a reliability score.
+
+The top of **Home** has an *I am currently a [Ride Taker] [Ride Giver]* switch.
+
+### Member verification
+
+Before booking or posting a ride, every member submits: **name, company name, place of work, designation, Ride Giver / Ride Taker / both, and an ID card picture**. An admin reviews it in *Admin dashboard → Verify*. The ID card image is stored separately from the member's record, is visible only to admins, and is **deleted the moment it is approved or rejected** (the audit log records the deletion). Verified members show a 🏢 company badge. Members can book and post while their verification is under review.
 
 - **Frontend:** React + Vite, Leaflet maps with OpenStreetMap tiles
 - **Backend:** Node.js (Express + WebSockets), SQLite via Node's built-in `node:sqlite` (no native installs)

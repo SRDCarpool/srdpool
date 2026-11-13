@@ -3,12 +3,14 @@ import { Icon, Avatar, RideCard, RouteLine, useNav } from '../ui';
 import { useT } from '../i18n';
 import { fmtTime, fmtDay, first, rupee } from '../geo';
 import { useFares } from './find';
+import { VerifyPrompt } from './verify';
+import { Segmented } from '../ui';
 
 const ORIGIN_NAMES = { sangareddy: 'Sangareddy', isnapur: 'Isnapur' };
 const lastOrigin = () => { try { return localStorage.getItem('saathi-origin') || 'sangareddy'; } catch { return 'sangareddy'; } };
 
 export default function Home() {
-  const { state, search } = useStore();
+  const { state, search, setRole } = useStore();
   const nav = useNav();
   const t = useT();
   const fares = useFares();
@@ -43,8 +45,11 @@ export default function Home() {
             {unread > 0 && <span className="dot-badge">{unread > 9 ? '9+' : unread}</span>}
           </button>
         </div>
+        <div className="role-switch">
+          <span>I am currently a</span>
+          <Segmented value={giver ? 'giver' : 'taker'} onChange={(r) => r !== state.me.role && setRole(r)} options={[['taker', '🙋 Ride Taker'], ['giver', '🚗 Ride Giver']]} />
+        </div>
         <h1>{giver ? 'Share your seats today' : 'Going to Financial District / HITEC City?'}</h1>
-        <p style={{ marginTop: 6 }}><span className="role-pill">{giver ? '🚗 Ride Giver' : '🙋 Ride Taker'}</span></p>
       </section>
 
       {giver ? (
@@ -69,6 +74,8 @@ export default function Home() {
           ))}
         </div>
       )}
+
+      <VerifyPrompt />
 
       {live && (
         <button className="card live-card" style={{ marginTop: 16, textAlign: 'left' }} onClick={() => nav.go('track', { rideId: live.id })}>
