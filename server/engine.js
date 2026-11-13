@@ -179,7 +179,7 @@ function notifyMatches(ride) {
 
 function ownRide(userId, rideId) {
   const ride = getRide(rideId);
-  if (ride.driverId !== userId) throw forbidden('Only the driver can do that');
+  if (ride.driverId !== userId) throw forbidden('Only the Ride Giver can do that');
   return ride;
 }
 
@@ -240,7 +240,7 @@ function beginRide(ride, simulate, approachKm = 0) {
 export function demoStart(userId, rideId) {
   if (!DEMO) throw forbidden();
   const ride = getRide(rideId);
-  if (!isBot(ride.driverId)) throw bad('Only demo drivers can be started remotely');
+  if (!isBot(ride.driverId)) throw bad('Only demo Ride Givers can be started remotely');
   if (!members(ride, ['confirmed']).some((b) => b.passengerId === userId)) throw bad('You need a confirmed seat');
   if (ride.status !== 'scheduled') throw bad('Ride already started');
   beginRide(ride, true, 2.2);
@@ -661,7 +661,7 @@ export function requestHelp(userId, rideId, { reason, note } = {}) {
   HelpRequests.insert(req);
   ride.breakdown = { reason: req.reason, at: req.at, helpId: req.id };
   saveRide(ride);
-  chat(ride.id, userId, `⚠️ ${req.reason}. I've asked other Saathi drivers nearby to take you to your destination. Please stay safe.`, true);
+  chat(ride.id, userId, `⚠️ ${req.reason}. I've asked other Saathi Ride Givers nearby to take you to your destination. Please stay safe.`, true);
   pax.forEach((b) => notify(b.passengerId, { type: 'track', title: `${first(driver.name)}'s car has a problem: ${req.reason}`, body: "We're finding you a seat in another Saathi ride nearby.", rideId }));
   const seats = pax.reduce((a, b) => a + b.seats, 0);
   helpers.forEach((r, i) => {
@@ -671,7 +671,7 @@ export function requestHelp(userId, rideId, { reason, note } = {}) {
   notify(userId, !pax.length
     ? { type: 'system', title: 'Breakdown reported', body: 'No passengers on board need a seat.', rideId }
     : helpers.length
-      ? { type: 'system', title: `Help request sent to ${helpers.length} nearby driver${helpers.length > 1 ? 's' : ''}`, body: `${seats} seat${seats > 1 ? 's' : ''} needed near ${req.placeName}`, rideId }
+      ? { type: 'system', title: `Help request sent to ${helpers.length} nearby Ride Giver${helpers.length > 1 ? 's' : ''}`, body: `${seats} seat${seats > 1 ? 's' : ''} needed near ${req.placeName}`, rideId }
       : { type: 'system', title: 'No nearby rides with empty seats right now', body: "We'll keep your request open. Use SOS if anyone is unsafe.", rideId });
   touchRide(ride);
   sync(helpers.map((r) => r.driverId));
@@ -856,8 +856,8 @@ export function adminVerify(adminId, userId, approve) {
   if (!u || u.verification !== 'pending') throw bad('Nothing to verify');
   u.verification = approve ? 'verified' : 'rejected';
   Users.save(u);
-  audit(adminId, approve ? 'Approved driver verification' : 'Rejected driver verification', u.name);
-  notify(userId, { type: 'system', title: approve ? 'You are now a verified driver ✅' : 'Verification needs attention', body: approve ? 'A verified badge now shows on your rides' : 'Please re-upload clear documents' });
+  audit(adminId, approve ? 'Approved Ride Giver verification' : 'Rejected Ride Giver verification', u.name);
+  notify(userId, { type: 'system', title: approve ? 'You are now a verified Ride Giver ✅' : 'Verification needs attention', body: approve ? 'A verified badge now shows on your rides' : 'Please re-upload clear documents' });
 }
 export function adminSuspend(adminId, userId) {
   const u = Users.get(userId);

@@ -78,7 +78,7 @@ export function SOSSheet({ open, onClose, rideId }) {
           <Icon name="alert" /> Alert my trusted contacts ({state.emergency.length})
         </button>
         <button className="btn outline block" onClick={share}><Icon name="share" /> Share live trip</button>
-        <div className="note"><Icon name="info" size={18} /> Trusted contacts get an SMS with the driver, vehicle number and your last known location. Our safety team is alerted too.</div>
+        <div className="note"><Icon name="info" size={18} /> Trusted contacts get an SMS with the Ride Giver's name, vehicle number and your last known location. Our safety team is alerted too.</div>
       </div>
     </Sheet>
   );

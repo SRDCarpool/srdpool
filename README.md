@@ -1,6 +1,6 @@
 # Saathi — Ride Together 🚗
 
-A friendly, mobile-first carpooling app for one commuter corridor:
+A friendly, mobile-first carpooling app **only for IT professionals**, on one commuter corridor:
 **Sangareddy / Isnapur → Financial District / HITEC City.**
 
 | Ride Takers see | Ride Givers see |
@@ -8,20 +8,20 @@ A friendly, mobile-first carpooling app for one commuter corridor:
 | Fixed routes and fixed fares only: **Sangareddy ₹150**, **Isnapur ₹120** per seat. Destination is always Financial District / HITEC City | A simple form: starting point, destination, date, time, seats, then **pickup points** in order. Passengers see it as one line, e.g. `9:00 AM Malkapur Chintal › SRD X Road › ORR › ICICI › Wipro Circle` |
 | Route choice from Sangareddy: **Via Isnapur & ORR** or the alternative **Via Shankarpally**. Isnapur riders always use the ORR route | The app detects the route (ORR or Shankarpally) and starting area (Sangareddy or Isnapur) from what they type; they can correct it with one tap |
 
-There is no rating system. Trust comes from OTP-verified phones, member verification, driver/vehicle verification, ride counts, cancellations and a reliability score.
+There is no rating system. Trust comes from OTP-verified phones, member verification, Ride Giver vehicle/licence verification, ride counts, cancellations and a reliability score.
 
 The top of **Home** has an *I am currently a [Ride Taker] [Ride Giver]* switch.
 
 ### Breakdown help (moving passengers to other rides)
 
-If a car has a problem during a live ride (flat tyre, engine trouble, accident, out of fuel…), the driver taps **Car trouble? Ask nearby drivers for help** on the live ride screen.
+If a car has a problem during a live ride (flat tyre, engine trouble, accident, out of fuel…), the Ride Giver taps **Car trouble? Ask nearby Ride Givers for help** on the live ride screen.
 
 1. The car is marked as stopped and passengers are told a seat is being found for them.
 2. Saathi alerts Ride Givers whose rides **pass the breakdown spot, haven't passed it yet, are live or leave within 75 minutes, and have empty seats**. They see a red 🆘 card on Home and an alert with the spot on a map.
 3. A helper taps **Offer seats**. Passengers are moved to the helper's ride automatically: a 🆘 pickup stop is added at the broken-down car, and each passenger is dropped at the helper's stop closest to where they were going. They pay the helper the same fare, and any earlier payment is refunded.
-4. Passengers get the new car's colour, model and number plate. The first driver sees who helped, and can end the ride, or tap **Problem fixed — continue ride** if the car is repaired.
+4. Passengers get the new car's colour, model and number plate. The first Ride Giver sees who helped, and can end the ride, or tap **Problem fixed — continue ride** if the car is repaired.
 
-In demo mode, demo drivers offer help after about 40 seconds, so real drivers get the first chance.
+In demo mode, demo Ride Givers offer help after about 40 seconds, so real Ride Givers get the first chance.
 
 ### Member verification
 
@@ -55,8 +55,8 @@ Defined in [`server/corridors.js`](server/corridors.js):
 | Via Isnapur & ORR | Sangareddy → Kandi → Rudraram → Isnapur → Patancheru ORR → Financial District → HITEC City | Sangareddy, Isnapur | ₹150 / ₹120 |
 | Via Shankarpally (alternative) | Sangareddy → Shankarpally → Mokila → Financial District → HITEC City | Sangareddy | ₹150 |
 
-Fares are per seat, set by where the passenger boards, and charged by the server (drivers don't set prices).
-Drivers' typed pickup points are placed along the route using known landmarks (SRD X Road, Kandi, Isnapur, Patancheru, ORR, Kollur, Shankarpally, Mokila, ICICI, Wipro Circle, Financial District, Gachibowli, HITEC City…); unknown names are spaced evenly between them. To add landmarks or change fares, edit `LANDMARKS` / `FARES` in that file.
+Fares are per seat, set by where the passenger boards, and charged by the server (Ride Givers don't set prices).
+Ride Givers' typed pickup points are placed along the route using known landmarks (SRD X Road, Kandi, Isnapur, Patancheru, ORR, Kollur, Shankarpally, Mokila, ICICI, Wipro Circle, Financial District, Gachibowli, HITEC City…); unknown names are spaced evenly between them. To add landmarks or change fares, edit `LANDMARKS` / `FARES` in that file.
 
 ## How it works
 
@@ -64,8 +64,8 @@ Drivers' typed pickup points are placed along the route using known landmarks (S
 |---|---|
 | Auth | Mobile OTP (hashed, 5-min expiry, 5 attempts, 30 s resend limit, per-IP rate limits) → 90-day session token |
 | Search | Passenger picks Sangareddy or Isnapur (+ route, date, optional time). Server returns rides on routes serving that origin, with the suggested boarding point and fixed fare |
-| Booking | Passenger chooses where to board and get down from the driver's pickup points; total = fare × seats |
-| Live tracking | Driver's phone streams GPS over WebSocket → snapped to the route → pushed only to confirmed passengers. Approaching/arrived/dropped notifications are server-side |
+| Booking | Passenger chooses where to board and get down from the Ride Giver's pickup points; total = fare × seats |
+| Live tracking | The Ride Giver's phone streams GPS over WebSocket → snapped to the route → pushed only to confirmed passengers. Approaching/arrived/dropped notifications are server-side |
 | Realtime | WebSocket per user: `sync` (refetch), `notification` (toast), `live` (car position) |
 | Privacy | Number plates are masked until a booking is confirmed; live location only for confirmed riders; phone numbers never leave the server |
 | Jobs | 1 s tick (simulated drives), 15 s housekeeping (expiry, reminders 30 min before departure) |
@@ -75,11 +75,11 @@ Drivers' typed pickup points are placed along the route using known landmarks (S
 
 | Flow | How |
 |---|---|
-| Ride Taker | Find Ride → *Isnapur ₹120* → open a ride (boarding defaults to the Isnapur stop) → *Request to book* (demo driver accepts in ~3 s) → *Demo: driver starts the ride* → live map → *I've boarded* → drop-off → pay |
+| Ride Taker | Find Ride → *Isnapur ₹120* → open a ride (boarding defaults to the Isnapur stop) → *Request to book* (demo Ride Giver accepts in ~3 s) → *Demo: Ride Giver starts the ride* → live map → *I've boarded* → drop-off → pay |
 | Alternative route | Find Ride → *Sangareddy* → *Via Shankarpally* |
 | Ride Giver | Profile → switch to Ride Giver → add vehicle → Post Ride → type start, destination, time, seats and pickup points → *Post Ride* → a demo passenger requests in ~5 s → Accept → *Slide to start* → *Picked up* → *Slide to end* |
 | Real GPS | Turn off *Simulate the drive* before starting; open the app on a phone and drive — the passenger sees your position move. Browsers allow GPS only on `localhost` or HTTPS, so use a tunnel (e.g. `cloudflared`) for phone testing |
-| Ride alert | Find Ride with no results → *Notify me* → a demo driver posts a matching ride in ~12 s |
+| Ride alert | Find Ride with no results → *Notify me* → a demo Ride Giver posts a matching ride in ~12 s |
 | Spam control | Post two rides within 90 min → blocked; same start and destination → flagged as a duplicate |
 
 Demo members (Ravi, Priya, Arjun…) are bots that keep fresh rides on both routes, accept requests and reply in chat. Turn them off with `DEMO_BOTS=0`.

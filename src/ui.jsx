@@ -162,7 +162,7 @@ export function Badges({ user, small }) {
   return (
     <>
       {user.workVerified && <span className={'badge blue' + (small ? ' sm' : '')}>🏢 {user.company || 'Work verified'}</span>}
-      {user.verified && <span className={'badge green' + (small ? ' sm' : '')}><Icon name="shield" size={12} /> Verified driver</span>}
+      {user.verified && <span className={'badge green' + (small ? ' sm' : '')}><Icon name="shield" size={12} /> Verified Ride Giver</span>}
       {user.trusted && <span className={'badge gold' + (small ? ' sm' : '')}>★ Trusted</span>}
     </>
   );
@@ -171,12 +171,12 @@ export function Badges({ user, small }) {
 const STAGES = [
   ['requested', 'Requested'],
   ['confirmed', 'Confirmed'],
-  ['started', 'Driver started'],
+  ['started', 'Ride started'],
   ['picked', 'Picked up'],
   ['completed', 'Completed'],
 ];
 export function StatusSteps({ booking, ride }) {
-  if (booking.status === 'transferred') return <div className="note"><Icon name="car" size={16} /><span>Moved to another driver's ride after a breakdown.</span></div>;
+  if (booking.status === 'transferred') return <div className="note"><Icon name="car" size={16} /><span>Moved to another Ride Giver's car after a breakdown.</span></div>;
   if (['cancelled', 'rejected', 'noshow', 'expired'].includes(booking.status)) {
     const label = { rejected: 'Request not accepted', noshow: 'Marked as no-show', expired: 'Ride expired', cancelled: 'Cancelled' }[booking.status];
     return <div className="status-cancel"><Icon name="x" size={16} /> {label}{booking.reason ? ` · ${booking.reason}` : ''}</div>;

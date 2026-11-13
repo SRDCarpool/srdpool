@@ -169,7 +169,7 @@ function Favorites() {
             );
           })}
         </div>
-      ) : <div className="card"><Empty icon="heart" title="No favourites yet" text="After a ride, tap the heart to add a driver or passenger you liked travelling with." /></div>}
+      ) : <div className="card"><Empty icon="heart" title="No favourites yet" text="After a ride, tap the heart to add a Ride Giver or Ride Taker you liked travelling with." /></div>}
       <div className="note" style={{ marginTop: 14 }}><Icon name="bell" size={18} /> You'll be notified when a favourite posts a ride on your routes.</div>
     </>
   );
@@ -186,7 +186,7 @@ function Alerts() {
       </div>
       {state.alerts.length ? (
         <div className="card menu">{state.alerts.map((a) => <Row key={a.id} icon="bell" title={`New rides from ${a.origin === 'isnapur' ? 'Isnapur' : 'Sangareddy'}`} sub={`${a.via === 'shankarpally' ? 'Via Shankarpally' : a.via === 'orr' ? 'Via ORR' : 'Any route'} · since ${fmtDay(a.at)}`} right={<button className="icon-btn" onClick={() => removeAlert(a.id)} aria-label="Delete alert"><Icon name="trash" size={18} /></button>} />)}</div>
-      ) : <div className="card"><Empty icon="bell" title="No ride alerts" text="In Find Ride, tap “Notify me” to get an alert when a driver posts a ride from Sangareddy or Isnapur." /></div>}
+      ) : <div className="card"><Empty icon="bell" title="No ride alerts" text="In Find Ride, tap “Notify me” to get an alert when a Ride Giver posts a ride from Sangareddy or Isnapur." /></div>}
     </>
   );
 }
@@ -325,11 +325,12 @@ function Language() {
 function Help() {
   const { logout } = useStore();
   const faqs = [
-    ['How do I book a ride?', 'Search your route, open a ride, and tap “Request to book”. The driver accepts and you get a notification.'],
-    ['How is the contribution decided?', 'Drivers set a cost-sharing amount (we suggest one based on fuel cost). There is no profit and no platform fee.'],
-    ['What if the driver cancels?', 'You get a full refund and we suggest other rides on your route.'],
+    ['How do I book a ride?', 'Search your route, open a ride, and tap “Request to book”. The Ride Giver accepts and you get a notification.'],
+    ['How is the fare decided?', 'Fares are fixed: ₹150 from Sangareddy and ₹120 from Isnapur, per seat. It is cost sharing between colleagues — no profit and no platform fee.'],
+    ['What if the Ride Giver cancels?', 'You get a full refund and we suggest other rides on your route.'],
     ['Is my phone number shared?', 'No. Chat and calls work through the app with masked numbers.'],
-    ['How do I become a verified driver?', 'Profile → Vehicle & verification. Upload your licence and RC — usually approved within 24 hours.'],
+    ['Who can join Saathi?', 'Only working IT professionals. Everyone verifies their company, designation and ID card before riding.'],
+    ['How do I become a verified Ride Giver?', 'Profile → Vehicle & verification. Upload your licence and RC — usually approved within 24 hours.'],
   ];
   return (
     <>

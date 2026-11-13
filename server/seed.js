@@ -7,12 +7,12 @@ import { newUser } from './engine.js';
 const COMPANY = { u_ravi: 'Wipro', u_priya: 'Microsoft', u_arjun: 'ICICI Bank', u_sneha: 'Wipro', u_vikram: 'Deloitte', u_ananya: 'Amazon', u_kiran: 'Infosys', u_meera: 'TCS', u_rahul: 'HCL' };
 
 const BOTS = [
-  ['u_ravi', 'Ravi Kumar', 34, '#2563EB', 4.8, 126, { ridesGiven: 142, cancellations: 2 }, true, 'Software engineer. Daily commute Sangareddy → HITEC City via ORR. Punctual & calm driver.', { brand: 'Maruti', model: 'Swift Dzire', color: 'White', reg: 'TS 09 EK 4521', type: 'Sedan' }],
+  ['u_ravi', 'Ravi Kumar', 34, '#2563EB', 4.8, 126, { ridesGiven: 142, cancellations: 2 }, true, 'Software engineer. Daily commute Sangareddy → HITEC City via ORR. Always on time, calm on the ORR.', { brand: 'Maruti', model: 'Swift Dzire', color: 'White', reg: 'TS 09 EK 4521', type: 'Sedan' }],
   ['u_priya', 'Priya Sharma', 29, '#DB2777', 4.9, 88, { ridesGiven: 95, cancellations: 1 }, true, 'Product designer. Uses the quieter Shankarpally route.', { brand: 'Honda', model: 'City', color: 'Silver', reg: 'TS 08 GH 7712', type: 'Sedan' }],
   ['u_arjun', 'Arjun Reddy', 31, '#7C3AED', 4.6, 54, { ridesGiven: 61, cancellations: 4 }, false, 'Lives in Isnapur, works in Financial District.', { brand: 'Hyundai', model: 'Creta', color: 'Blue', reg: 'TS 07 FB 3390', type: 'SUV' }],
   ['u_sneha', 'Sneha Patel', 27, '#EA580C', 4.7, 40, { ridesGiven: 44, cancellations: 1 }, true, 'Data analyst at Wipro. Starts from Malkapur Chintal every weekday.', { brand: 'Maruti', model: 'Baleno', color: 'Red', reg: 'TS 10 CD 2245', type: 'Hatchback' }],
   ['u_vikram', 'Vikram Rao', 42, '#0891B2', 4.9, 210, { ridesGiven: 230, cancellations: 3 }, true, 'SUV with space for 2 more. Leaves Sangareddy at 8 AM sharp.', { brand: 'Toyota', model: 'Innova Crysta', color: 'Grey', reg: 'TS 09 FA 9001', type: 'SUV' }],
-  ['u_ananya', 'Ananya Iyer', 26, '#16A34A', 4.5, 18, { ridesGiven: 20, cancellations: 2 }, false, 'EV driver 🌱 Takes the Shankarpally road to Financial District.', { brand: 'Tata', model: 'Nexon EV', color: 'Teal', reg: 'TS 11 EV 0042', type: 'EV' }],
+  ['u_ananya', 'Ananya Iyer', 26, '#16A34A', 4.5, 18, { ridesGiven: 20, cancellations: 2 }, false, 'Drives an EV 🌱 Takes the Shankarpally road to Financial District.', { brand: 'Tata', model: 'Nexon EV', color: 'Teal', reg: 'TS 11 EV 0042', type: 'EV' }],
   ['u_kiran', 'Kiran Rao', 24, '#CA8A04', 4.7, 31, { ridesTaken: 48, cancellations: 1 }, true, 'Student at JNTU. Always on time.', null],
   ['u_meera', 'Meera Nair', 30, '#9333EA', 4.8, 22, { ridesTaken: 35, cancellations: 0 }, true, 'HR manager. Quiet traveller.', null],
   ['u_rahul', 'Rahul Verma', 28, '#DC2626', 4.2, 12, { ridesTaken: 15, cancellations: 3 }, false, 'Sales executive.', null],
@@ -22,7 +22,7 @@ function ensureBots() {
   for (const [id, name, age, color, avg, count, stats, trusted, bio, vehicle] of BOTS) {
     const existing = Users.get(id);
     if (existing) {
-      if (!existing.work) Users.save({ ...existing, work: { status: 'verified', company: COMPANY[id] || 'Infosys', workplace: 'Financial District', designation: 'Engineer', roles: vehicle ? 'giver' : 'taker' } });
+      if (!existing.work || existing.bio !== bio) Users.save({ ...existing, bio, work: existing.work || { status: 'verified', company: COMPANY[id] || 'Infosys', workplace: 'Financial District', designation: 'Engineer', roles: vehicle ? 'giver' : 'taker' } });
       continue;
     }
     Users.insert({

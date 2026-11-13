@@ -26,7 +26,7 @@ export function HelpAlertCards() {
   ));
 }
 
-/** Screen for a driver who received a help request. */
+/** Screen for a Ride Giver who received a help request. */
 export function HelpScreen({ helpId }) {
   const { state, offerHelp, declineHelp } = useStore();
   const nav = useNav();
@@ -71,7 +71,7 @@ export function HelpScreen({ helpId }) {
       )}
 
       {req.status !== 'open' ? (
-        <div className="note green" style={{ marginTop: 12 }}><Icon name="check" size={18} /> {req.status === 'resolved' ? 'Everyone has been given a seat. Thank you!' : 'The driver fixed the problem — no help needed now.'}</div>
+        <div className="note green" style={{ marginTop: 12 }}><Icon name="check" size={18} /> {req.status === 'resolved' ? 'Everyone has been given a seat. Thank you!' : 'The problem has been fixed — no help needed now.'}</div>
       ) : req.seatsNeeded === 0 ? (
         <div className="note green" style={{ marginTop: 12 }}><Icon name="check" size={18} /> All passengers have been placed.</div>
       ) : !myRide || req.mySeatsLeft < 1 ? (
@@ -86,7 +86,7 @@ export function HelpScreen({ helpId }) {
   );
 }
 
-/** Driver's breakdown button + status, shown on the live ride screen. */
+/** Ride Giver's breakdown button + status, shown on the live ride screen. */
 export function HelpPanel({ ride }) {
   const { state, requestHelp, cancelHelp } = useStore();
   const nav = useNav();
@@ -104,7 +104,7 @@ export function HelpPanel({ ride }) {
         <small style={{ display: 'block', marginTop: 2 }}>Near {req.placeName} · {timeAgo(req.at)}</small>
         <div className="divider" />
         {req.candidates.length === 0 && req.status === 'open' && <div className="note warn"><Icon name="info" size={18} /> No nearby rides with empty seats yet. Your request stays open; use SOS if anyone is unsafe.</div>}
-        {req.candidates.length > 0 && <div className="kv"><span>Drivers alerted</span><b>{req.candidates.length}</b></div>}
+        {req.candidates.length > 0 && <div className="kv"><span>Ride Givers alerted</span><b>{req.candidates.length}</b></div>}
         {req.offers.map((o, i) => <div key={i} className="kv"><span>🙏 {o.driverName}</span><b>took {o.seats} seat{o.seats > 1 ? 's' : ''}</b></div>)}
         <div className="kv"><span>Passengers still waiting</span><b>{req.passengersWaiting}</b></div>
         {req.status === 'resolved' && <div className="note green" style={{ marginTop: 8 }}><Icon name="check" size={18} /> All your passengers are in other cars. End your ride when you're ready.</div>}
@@ -122,14 +122,14 @@ export function HelpPanel({ ride }) {
   };
   return (
     <>
-      <button className="btn danger-ghost block" style={{ marginTop: 12 }} onClick={() => setOpen(true)}><Icon name="alert" /> Car trouble? Ask nearby drivers for help</button>
+      <button className="btn danger-ghost block" style={{ marginTop: 12 }} onClick={() => setOpen(true)}><Icon name="alert" /> Car trouble? Ask nearby Ride Givers for help</button>
       <Sheet open={open} onClose={() => setOpen(false)} title="What happened?">
-        <p className="muted" style={{ marginBottom: 12 }}>We'll alert Saathi drivers coming this way with empty seats, so your {onBoard} passenger{onBoard !== 1 ? 's' : ''} can continue safely in their car.</p>
+        <p className="muted" style={{ marginBottom: 12 }}>We'll alert Saathi Ride Givers coming this way with empty seats, so your {onBoard} passenger{onBoard !== 1 ? 's' : ''} can continue safely in their car.</p>
         <div className="opts" style={{ padding: 0 }}>
           {REASONS.map(([r, e]) => <Chip key={r} on={reason === r} onClick={() => setReason(r)}>{e} {r}</Chip>)}
         </div>
         <textarea className="input" style={{ marginTop: 12 }} placeholder="Anything helpers should know? (optional) e.g. parked on the left after the ORR exit" value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} />
-        <div className="note" style={{ marginTop: 12 }}><Icon name="info" size={18} /> Your car's live location is shared with drivers who can help. If anyone is hurt or unsafe, call 112 first.</div>
+        <div className="note" style={{ marginTop: 12 }}><Icon name="info" size={18} /> Your car's live location is shared with Ride Givers who can help. If anyone is hurt or unsafe, call 112 first.</div>
         <button className="btn danger block" style={{ marginTop: 14 }} disabled={!reason || busy} onClick={send}>{busy ? 'Sending…' : 'Ask for help'}</button>
       </Sheet>
     </>

@@ -113,14 +113,14 @@ export function FindRide() {
         {!main.length && !res.loading && (
           <div className="card">
             <Empty icon="bell" title={`No rides from ${ORIGIN_NAMES[origin]} yet`}
-              text="Turn on an alert and we'll notify you as soon as a driver posts one."
+              text="Turn on an alert and we'll notify you as soon as a Ride Giver posts one."
               action={<button className="btn block" disabled={hasAlert} onClick={() => createAlert({ origin, via: q.via })}><Icon name="bell" /> {hasAlert ? 'Alert is on' : 'Notify me'}</button>} />
           </div>
         )}
         {main.length > 0 && !hasAlert && (
           <button className="row" style={{ marginTop: 12 }} onClick={() => createAlert({ origin, via: q.via })}>
             <span className="row-ic blue"><Icon name="bell" size={18} /></span>
-            <span className="row-txt"><b>Notify me about new rides from {ORIGIN_NAMES[origin]}</b><small>Get an alert when a driver posts</small></span>
+            <span className="row-txt"><b>Notify me about new rides from {ORIGIN_NAMES[origin]}</b><small>Get an alert when a Ride Giver posts</small></span>
           </button>
         )}
       </div>
@@ -128,7 +128,7 @@ export function FindRide() {
   );
 }
 
-const CANCEL_REASONS = ['My plans changed', 'Found another ride', 'Driver asked me to cancel', 'Running late', 'Other'];
+const CANCEL_REASONS = ['My plans changed', 'Found another ride', 'Ride Giver asked me to cancel', 'Running late', 'Other'];
 
 export function CancelSheet({ open, onClose, onConfirm, title = 'Cancel booking', reasons = CANCEL_REASONS, policy }) {
   const [r, setR] = useState('');
@@ -204,7 +204,7 @@ export function RideDetail({ rideId, origin: originParam, pickupIdx: pIdx }) {
   return (
     <div className="screen no-tab">
       <Header title={`${stops[pi].name} → ${stops[di].name}`} sub={`${fmtDay(ride.time)} · ${fmtTime(ride.time)} · ${VIA[ride.corridor] || ''}`}
-        right={<button className="icon-btn" onClick={() => toggleFavorite(ride.driverId)} aria-label="Favourite driver"><Icon name="heart" fill={fav ? 'var(--danger)' : 'none'} style={{ color: fav ? 'var(--danger)' : undefined }} /></button>} />
+        right={<button className="icon-btn" onClick={() => toggleFavorite(ride.driverId)} aria-label="Favourite this Ride Giver"><Icon name="heart" fill={fav ? 'var(--danger)' : 'none'} style={{ color: fav ? 'var(--danger)' : undefined }} /></button>} />
 
       <MapView ride={ride} pickupIdx={pi} dropIdx={di} height={210} live={ride.live} showLabels={false} />
 
@@ -267,7 +267,7 @@ export function RideDetail({ rideId, origin: originParam, pickupIdx: pIdx }) {
         {!confirmed && <small style={{ display: 'block', marginTop: 8 }}><Icon name="lock" size={12} /> Full number plate is shown after your booking is confirmed</small>}
       </button>
 
-      {ride.notes && <div className="card" style={{ marginTop: 12 }}><b>Driver's note</b><p className="muted" style={{ marginTop: 4 }}>“{ride.notes}”</p></div>}
+      {ride.notes && <div className="card" style={{ marginTop: 12 }}><b>Note from {first(driver.name)}</b><p className="muted" style={{ marginTop: 4 }}>“{ride.notes}”</p></div>}
 
       <div className="card" style={{ marginTop: 12 }}>
         <b>Fare</b>
@@ -279,8 +279,8 @@ export function RideDetail({ rideId, origin: originParam, pickupIdx: pIdx }) {
           <summary className="link" style={{ cursor: 'pointer' }}>Cancellation & refund policy</summary>
           <ul className="muted" style={{ fontSize: 13.5, paddingLeft: 18, margin: '8px 0 0' }}>
             <li>Free cancellation up to 1 hour before departure.</li>
-            <li>Within 1 hour: 50% of the fare goes to the driver.</li>
-            <li>Driver cancels: full refund, always.</li>
+            <li>Within 1 hour: 50% of the fare goes to the Ride Giver.</li>
+            <li>Ride Giver cancels: full refund, always.</li>
           </ul>
         </details>
       </div>
@@ -297,7 +297,7 @@ export function RideDetail({ rideId, origin: originParam, pickupIdx: pIdx }) {
         {canChoose && (
           left >= seats ? (
             <div className="stack">
-              <input className="input" placeholder="Note for the driver (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+              <input className="input" placeholder={`Note for ${first(driver.name)} (optional)`} value={note} onChange={(e) => setNote(e.target.value)} />
               <div className="hstack">
                 <Stepper value={seats} onChange={setSeats} max={Math.max(1, Math.min(4, left))} />
                 {isVerifiedOrPending(state)
@@ -314,7 +314,7 @@ export function RideDetail({ rideId, origin: originParam, pickupIdx: pIdx }) {
         {activeB?.status === 'requested' && <button className="btn danger-ghost block" onClick={() => setCancel(true)}>Cancel request</button>}
         {activeB?.status === 'confirmed' && ride.status === 'scheduled' && (
           <div className="stack">
-            {state.config?.demo && driver.demo && <button className="btn block" onClick={() => demoStartRide(ride.id)}><Icon name="car" /> Demo: driver starts the ride</button>}
+            {state.config?.demo && driver.demo && <button className="btn block" onClick={() => demoStartRide(ride.id)}><Icon name="car" /> Demo: Ride Giver starts the ride</button>}
             <button className="btn danger-ghost block" onClick={() => setCancel(true)}>Cancel booking</button>
           </div>
         )}

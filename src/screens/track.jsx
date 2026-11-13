@@ -92,7 +92,7 @@ function PassengerPanel({ ride, b, pos, driver, onCall, onBoard }) {
   const toPickup = stops[b.pickupIdx].pos - pos, toDrop = stops[b.dropIdx].pos - pos;
   const arrive = (kmLeft) => fmtTime(Date.now() + etaMin(kmLeft, ride) * 60000);
   let title, sub, tone = '';
-  if (ride.status !== 'started') { title = 'Waiting for the driver to start'; sub = `Departs ${fmtTime(ride.time)}`; }
+  if (ride.status !== 'started') { title = 'Waiting for the Ride Giver to start'; sub = `Departs ${fmtTime(ride.time)}`; }
   else if (b.status === 'confirmed' && !b.arrivedAt) {
     title = pos < 0 ? `${first(driver.name)} is heading to the start point` : `${first(driver.name)} arrives in ${etaMin(toPickup, ride)} min`;
     sub = `At ${stops[b.pickupIdx].name} around ${arrive(toPickup)} · ${km(Math.max(0, toPickup))} away`;
@@ -105,14 +105,14 @@ function PassengerPanel({ ride, b, pos, driver, onCall, onBoard }) {
       <div className={tone ? 'note green' : ''} style={{ marginBottom: 12 }}>
         <div><b style={{ fontSize: 17 }}>{title}</b><small style={{ display: 'block' }}>{sub}</small></div>
       </div>
-      {ride.delayMin > 0 && b.status === 'confirmed' && <div className="note warn" style={{ marginBottom: 12 }}><Icon name="clock" size={18} /> Driver reported a {ride.delayMin} min delay</div>}
+      {ride.delayMin > 0 && b.status === 'confirmed' && <div className="note warn" style={{ marginBottom: 12 }}><Icon name="clock" size={18} /> {first(driver.name)} reported a {ride.delayMin} min delay</div>}
       <div className="hstack">
         <Avatar user={driver} size={48} />
         <div className="grow">
           <b>{driver.name}</b>
           <small style={{ display: 'block' }}>{ride.vehicle.color} {ride.vehicle.brand} {ride.vehicle.model}</small>
         </div>
-        <button className="icon-btn" style={{ background: 'var(--primary-50)', color: 'var(--primary)' }} onClick={onCall} aria-label="Call driver"><Icon name="phone" size={19} /></button>
+        <button className="icon-btn" style={{ background: 'var(--primary-50)', color: 'var(--primary)' }} onClick={onCall} aria-label={`Call ${driver.name}`}><Icon name="phone" size={19} /></button>
       </div>
       <div className="hstack" style={{ marginTop: 12, justifyContent: 'space-between' }}>
         <small>Match this number plate</small>
@@ -227,7 +227,7 @@ export function Chat({ rideId }) {
   );
 }
 
-/** Shown when a ride ends: payment for passengers, a summary for drivers. No ratings. */
+/** Shown when a ride ends: payment for Ride Takers, a summary for Ride Givers. No ratings. */
 export function RideDone({ bookingId, rideId }) {
   const { state, pay, toggleFavorite } = useStore();
   const nav = useNav();
@@ -259,7 +259,7 @@ export function RideDone({ bookingId, rideId }) {
           ) : (
             <>
               <button className="btn block" style={{ marginTop: 8 }} onClick={() => pay(b.id)}>Pay {rupee(b.amount)} via UPI</button>
-              <small style={{ display: 'block', marginTop: 8 }}>Or pay the driver in cash. UPI runs in test mode until a payment gateway is connected.</small>
+              <small style={{ display: 'block', marginTop: 8 }}>Or pay the Ride Giver in cash. UPI runs in test mode until a payment gateway is connected.</small>
             </>
           )}
         </div>

@@ -71,7 +71,7 @@ export default function Admin() {
               </div>
             </div>
           ))}
-          {d.queue.length > 0 && <b style={{ marginTop: 8 }}>Driver & vehicle</b>}
+          {d.queue.length > 0 && <b style={{ marginTop: 8 }}>Ride Giver vehicle & licence</b>}
         </div>
       )}
       {tab === 'verify' && (d.queue.length ? (
@@ -85,7 +85,7 @@ export default function Admin() {
               <div className="kv"><span>Licence no.</span><b>{u.licence || '—'}</b></div>
               <div className="btn-row" style={{ marginTop: 12 }}>
                 <button className="btn danger-ghost" onClick={() => act(`/admin/verify/${u.id}`, { approve: false }, 'Verification rejected')}>Reject</button>
-                <button className="btn" onClick={() => act(`/admin/verify/${u.id}`, { approve: true }, 'Driver verified ✅')}><Icon name="check" /> Approve</button>
+                <button className="btn" onClick={() => act(`/admin/verify/${u.id}`, { approve: true }, 'Ride Giver verified ✅')}><Icon name="check" /> Approve</button>
               </div>
             </div>
           ))}
@@ -119,7 +119,7 @@ export default function Admin() {
             <tbody>
               {d.users.map((u) => (
                 <tr key={u.id}>
-                  <td><div className="hstack" style={{ gap: 8 }}><Avatar user={u} size={30} /><span><b style={{ fontSize: 13.5 }}>{u.name}</b><small style={{ display: 'block' }}>{u.isDriver ? 'Driver' : 'Passenger'}{u.verified ? ' · ✓' : ''} · {u.phone}</small></span></div></td>
+                  <td><div className="hstack" style={{ gap: 8 }}><Avatar user={u} size={30} /><span><b style={{ fontSize: 13.5 }}>{u.name}</b><small style={{ display: 'block' }}>{u.isDriver ? 'Ride Giver' : 'Ride Taker'}{u.verified ? ' · ✓' : ''} · {u.phone}</small></span></div></td>
                   <td>{u.completed || 0}</td>
                   <td>{u.suspended ? <span className="badge sm red">Suspended</span> : <span className="badge sm green">Active</span>}</td>
                   <td>{u.id !== 'me' && <button className="link" onClick={() => act(`/admin/suspend/${u.id}`, {}, u.suspended ? 'Account restored' : 'Account suspended')}>{u.suspended ? 'Restore' : 'Suspend'}</button>}</td>

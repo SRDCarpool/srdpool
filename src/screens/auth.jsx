@@ -4,8 +4,8 @@ import { Icon, Avatar } from '../ui';
 import { LANGS } from '../i18n';
 
 const SLIDES = [
-  { art: '🚗', title: 'Share rides with people going your way', text: 'Find drivers already travelling on your route — even if you start from a different place.' },
-  { art: '🛡️', title: 'Safe, verified & private', text: 'Verified drivers, live trip tracking, SOS and in-app chat — your phone number stays private.' },
+  { art: '🚗', title: 'Share rides with IT colleagues going your way', text: 'Sangareddy & Isnapur to Financial District / HITEC City — ride with verified IT professionals on your route.' },
+  { art: '🛡️', title: 'Only verified IT professionals', text: 'Everyone verifies their company and ID. Live trip tracking, SOS and in-app chat — your phone number stays private.' },
   { art: '💸', title: 'Save money on your daily commute', text: 'Transparent cost sharing. Set your office or college route once and get matches every day.' },
 ];
 
