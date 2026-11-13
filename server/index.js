@@ -10,7 +10,7 @@ import { attachRealtime, sync } from './realtime.js';
 import { CITY } from './geo.js';
 import { FARES, CORRIDORS, servesOrigin, suggestPickup, suggestDrop, loadCorridors, publicCorridors } from './corridors.js';
 import { smsConfigured } from './sms.js';
-import { sendEmailOtp, mailConfigured } from './mail.js';
+import { sendEmailOtp, mailConfigured, mailMode, checkMail } from './mail.js';
 import { refreshDemoRides } from './seed.js';
 
 const PROD = process.env.NODE_ENV === 'production';
@@ -98,7 +98,7 @@ app.post('/api/auth/otp', limit('otp', 5, 60000), h(async (req) => {
   const code = String(crypto.randomInt(0, 1e6)).padStart(6, '0');
   Otps.save({ id: key, hash: sha(key + code), expires: Date.now() + 10 * 60000, attempts: 0, sentAt: Date.now() });
   try { await sendEmailOtp(email, code); } catch (e) {
-    console.error('[mail]', e.message);
+    console.error('[mail] send failed:', e.message);
     throw new E.HttpError(502, "We couldn't send the email. Check the address and try again.");
   }
   return { ok: true, email, devCode: !PROD && !mailConfigured ? code : undefined };
@@ -361,4 +361,4 @@ loadCorridors().then(() => {
   refreshDemoRides().catch((e) => console.error('[seed]', e));
   setInterval(() => refreshDemoRides().catch((e) => console.error('[seed]', e)), 30 * MIN);
 }).catch((e) => console.error('[corridors]', e));
-server.listen(PORT, () => console.log(`SRDPool API on http://localhost:${PORT}  (demo bots: ${E.DEMO ? 'on' : 'off'}, SMS: ${smsConfigured ? 'Twilio' : 'console'})`));
+server.listen(PORT, () => { console.log(`SRDPool API on http://localhost:${PORT}  (demo bots: ${E.DEMO ? 'on' : 'off'}, email: ${mailMode}, SMS: ${smsConfigured ? 'Twilio' : 'console'})`); checkMail(); });

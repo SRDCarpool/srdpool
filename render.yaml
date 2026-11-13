@@ -25,7 +25,10 @@ services:
         value: "0"
       - key: GEO_USER_AGENT
         value: SRDPool-carpool/1.0
-      # Brevo SMTP (Brevo → SMTP & API → SMTP)
+      # Brevo HTTPS API (Brevo → SMTP & API → API Keys). Recommended: works on every Render plan.
+      - key: BREVO_API_KEY
+        sync: false
+      # Brevo SMTP fallback (Brevo → SMTP & API → SMTP) — leave empty when using the API key.
       - key: SMTP_HOST
         value: smtp-relay.brevo.com
       - key: SMTP_PORT

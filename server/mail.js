@@ -1,26 +1,72 @@
-// Email delivery for sign-in codes. Works with any SMTP provider (Google Workspace / Gmail
-// app password, Zoho, Amazon SES, Brevo…). Without SMTP settings, emails print to the
-// server console in development; production refuses to send codes until it is configured.
+// Email delivery for sign-in codes.
+//  1. BREVO_API_KEY set → Brevo's HTTPS API (port 443). Works on hosts that block SMTP
+//     ports, e.g. Render's free instances. Recommended.
+//  2. SMTP_HOST/USER/PASS set → any SMTP provider (Google Workspace, Zoho, SES…).
+//  3. Neither → development: emails print to the server console.
 import nodemailer from 'nodemailer';
 
-const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM } = process.env;
-export const mailConfigured = !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
+const { BREVO_API_KEY, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM } = process.env;
+const useBrevoApi = !!BREVO_API_KEY;
+const useSmtp = !useBrevoApi && !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
+export const mailConfigured = useBrevoApi || useSmtp;
+export const mailMode = useBrevoApi ? 'brevo-api' : useSmtp ? 'smtp' : 'console';
 
-const transport = mailConfigured
+/** "SRDPool <codes@example.com>" → { name, email } */
+function parseFrom(from) {
+  const m = String(from || '').match(/^\s*(.*?)\s*<\s*([^>]+)\s*>\s*$/);
+  if (m) return { name: m[1].replace(/^"|"$/g, '') || 'SRDPool', email: m[2] };
+  return { name: 'SRDPool', email: String(from || SMTP_USER || '').trim() };
+}
+const sender = parseFrom(MAIL_FROM);
+
+const transport = useSmtp
   ? nodemailer.createTransport({
     host: SMTP_HOST,
     port: Number(SMTP_PORT || 587),
     secure: Number(SMTP_PORT) === 465,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   })
   : null;
 
+async function sendViaBrevo(to, subject, text, html) {
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: { 'api-key': BREVO_API_KEY, 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({ sender, to: [{ email: to }], subject, textContent: text, htmlContent: html }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Brevo API ${res.status}: ${body.slice(0, 300)}`);
+  }
+}
+
 export async function sendMail(to, subject, text, html) {
-  if (!transport) {
-    console.log(`\n✉️  [dev email → ${to}] ${subject}\n${text}\n`);
+  if (useBrevoApi) return sendViaBrevo(to, subject, text, html);
+  if (useSmtp) {
+    await transport.sendMail({ from: MAIL_FROM || `SRDPool <${SMTP_USER}>`, to, subject, text, html });
     return;
   }
-  await transport.sendMail({ from: MAIL_FROM || `SRDPool <${SMTP_USER}>`, to, subject, text, html });
+  console.log(`\n✉️  [dev email → ${to}] ${subject}\n${text}\n`);
+}
+
+/** Startup check so problems show up in the host's logs straight away. */
+export async function checkMail() {
+  if (useBrevoApi) {
+    try {
+      const res = await fetch('https://api.brevo.com/v3/account', { headers: { 'api-key': BREVO_API_KEY, accept: 'application/json' }, signal: AbortSignal.timeout(10000) });
+      console.log(res.ok ? `[mail] Brevo API ready · sending as ${sender.email}` : `[mail] Brevo API key rejected (${res.status}) — check BREVO_API_KEY`);
+    } catch (e) { console.log('[mail] cannot reach Brevo API:', e.message); }
+  } else if (useSmtp) {
+    try { await transport.verify(); console.log(`[mail] SMTP ready (${SMTP_HOST}:${SMTP_PORT || 587}) · sending as ${MAIL_FROM || SMTP_USER}`); } catch (e) {
+      console.log(`[mail] SMTP check failed (${SMTP_HOST}:${SMTP_PORT || 587}): ${e.message}. If your host blocks SMTP ports, set BREVO_API_KEY instead.`);
+    }
+  } else {
+    console.log('[mail] no email service configured — sign-in codes print to this console');
+  }
 }
 
 export function sendEmailOtp(email, code) {
