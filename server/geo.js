@@ -5,7 +5,7 @@ import { GeoCache } from './db.js';
 
 const OSRM_URL = process.env.OSRM_URL || 'https://router.project-osrm.org';
 const NOMINATIM_URL = process.env.NOMINATIM_URL || 'https://nominatim.openstreetmap.org';
-const UA = process.env.GEO_USER_AGENT || 'Saathi-carpool-dev/0.1';
+const UA = process.env.GEO_USER_AGENT || 'SRDPool-carpool-dev/0.1';
 export const CITY = { name: process.env.CITY_NAME || 'Hyderabad', lat: Number(process.env.CITY_LAT || 17.42), lng: Number(process.env.CITY_LNG || 78.44) };
 
 /* ---------------- geometry ---------------- */

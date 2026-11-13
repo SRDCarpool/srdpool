@@ -30,7 +30,7 @@ export function Track({ rideId }) {
 
   const share = async () => {
     const where = ride.live ? ` Live location: https://maps.google.com/?q=${ride.live.lat.toFixed(5)},${ride.live.lng.toFixed(5)}` : '';
-    const text = `I'm on a Saathi ride with ${driver.name} (${ride.vehicle.color} ${ride.vehicle.brand} ${ride.vehicle.model}, ${ride.vehicle.reg}) from ${stops[0].name} to ${stops.at(-1).name}.${where}`;
+    const text = `I'm on a SRDPool ride with ${driver.name} (${ride.vehicle.color} ${ride.vehicle.brand} ${ride.vehicle.model}, ${ride.vehicle.reg}) from ${stops[0].name} to ${stops.at(-1).name}.${where}`;
     try {
       if (navigator.share) await navigator.share({ title: 'My live ride', text });
       else { await navigator.clipboard.writeText(text); toast('Trip status copied', 'Send it to a trusted contact'); }
@@ -66,7 +66,7 @@ export function Track({ rideId }) {
           )}
           <div className="note" style={{ marginTop: 12 }}>
             <Icon name="lock" size={18} />
-            <span>{mine ? (ride.simulate ? 'Simulated drive (demo). ' : "Sharing this phone's GPS. Keep Saathi open while driving. ") + 'Only confirmed passengers can see your location.' : 'Live location is visible only to confirmed passengers on this ride.'} Sharing stops automatically when the ride ends.</span>
+            <span>{mine ? (ride.simulate ? 'Simulated drive (demo). ' : "Sharing this phone's GPS. Keep SRDPool open while driving. ") + 'Only confirmed passengers can see your location.' : 'Live location is visible only to confirmed passengers on this ride.'} Sharing stops automatically when the ride ends.</span>
           </div>
           {mine && (
             <div className="sticky-cta">
@@ -82,7 +82,7 @@ export function Track({ rideId }) {
             action={<button className="btn" onClick={() => nav.replace('done', mine ? { rideId } : { bookingId: b.id })}><Icon name="check" /> Finish</button>} />
         </div>
       )}
-      <CallSheet open={!!call} onClose={() => setCall(null)} user={call} />
+      <CallSheet open={!!call} onClose={() => setCall(null)} user={call} rideId={rideId} />
     </div>
   );
 }
@@ -198,7 +198,7 @@ export function Chat({ rideId }) {
     <div className="screen no-tab" style={{ paddingBottom: 0, display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
       <Header title={title} sub={`${ride.stops[0].name} → ${ride.stops.at(-1).name} · ${fmtTime(ride.time)}`}
         right={other && <button className="icon-btn" onClick={() => setRep(true)} aria-label="Report conversation"><Icon name="flag" size={19} /></button>} />
-      <div className="note green" style={{ fontSize: 12.5 }}><Icon name="lock" size={16} /> Chat is private to this ride. Phone numbers are never shared.</div>
+      <div className="note green" style={{ fontSize: 12.5 }}><Icon name="lock" size={16} /> Chat is private to this ride. Need to talk? Tap Call — numbers are shared only between confirmed co-riders.</div>
       <div className="chat grow">
         {!msgs.length && <p className="muted center" style={{ marginTop: 30 }}>Say hello 👋 and confirm your pickup point.</p>}
         {msgs.map((m) => {
@@ -244,7 +244,7 @@ export function RideDone({ bookingId, rideId }) {
       <div className="card center">
         <div style={{ fontSize: 46 }}>🏁</div>
         <h2 style={{ fontSize: 20 }}>{b ? `${ride.stops[b.pickupIdx].name} → ${ride.stops[b.dropIdx].name}` : `${ride.stops[0].name} → ${ride.stops.at(-1).name}`}</h2>
-        <p className="muted">{mine ? `${pax.filter((x) => x.status === 'completed').length} passenger(s) dropped · ${rupee(pax.filter((x) => x.status === 'completed').reduce((a, x) => a + x.amount, 0))} in fares` : 'Thanks for riding with Saathi!'}</p>
+        <p className="muted">{mine ? `${pax.filter((x) => x.status === 'completed').length} passenger(s) dropped · ${rupee(pax.filter((x) => x.status === 'completed').reduce((a, x) => a + x.amount, 0))} in fares` : 'Thanks for riding with SRDPool!'}</p>
       </div>
 
       {b && (

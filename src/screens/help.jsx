@@ -124,7 +124,7 @@ export function HelpPanel({ ride }) {
     <>
       <button className="btn danger-ghost block" style={{ marginTop: 12 }} onClick={() => setOpen(true)}><Icon name="alert" /> Car trouble? Ask nearby Ride Givers for help</button>
       <Sheet open={open} onClose={() => setOpen(false)} title="What happened?">
-        <p className="muted" style={{ marginBottom: 12 }}>We'll alert Saathi Ride Givers coming this way with empty seats, so your {onBoard} passenger{onBoard !== 1 ? 's' : ''} can continue safely in their car.</p>
+        <p className="muted" style={{ marginBottom: 12 }}>We'll alert SRDPool Ride Givers coming this way with empty seats, so your {onBoard} passenger{onBoard !== 1 ? 's' : ''} can continue safely in their car.</p>
         <div className="opts" style={{ padding: 0 }}>
           {REASONS.map(([r, e]) => <Chip key={r} on={reason === r} onClick={() => setReason(r)}>{e} {r}</Chip>)}
         </div>
@@ -155,7 +155,7 @@ export function PassengerHelpBanner({ ride, booking }) {
     return (
       <div className="note danger" style={{ marginTop: 12 }}>
         <Icon name="alert" size={18} />
-        <span><b>Car trouble: {ride.breakdown.reason}.</b> We're finding you a seat in another Saathi ride coming this way. You'll get a notification with the new car's details.</span>
+        <span><b>Car trouble: {ride.breakdown.reason}.</b> We're finding you a seat in another SRDPool ride coming this way. You'll get a notification with the new car's details.</span>
       </div>
     );
   }

@@ -20,9 +20,9 @@ export default function Admin() {
 
   return (
     <div className="screen no-tab">
-      <Header title="Admin dashboard" sub="Saathi operations" right={<button className="icon-btn" onClick={() => setTick((x) => x + 1)} aria-label="Refresh"><Icon name="repeat" size={19} /></button>} />
+      <Header title="Admin dashboard" sub="SRDPool operations" right={<button className="icon-btn" onClick={() => setTick((x) => x + 1)} aria-label="Refresh"><Icon name="repeat" size={19} /></button>} />
       <div className="hscroll" style={{ marginBottom: 12 }}>
-        <Segmented value={tab} onChange={setTab} options={[['overview', 'Overview'], ['verify', `Verify (${d.queue.length + d.workQueue.length})`], ['reports', `Reports (${openReports})`], ['users', 'Users'], ['rides', 'Rides'], ['audit', 'Audit log']]} />
+        <Segmented value={tab} onChange={setTab} options={[['overview', 'Overview'], ['verify', `Verify (${d.workQueue.length})`], ['reports', `Reports (${openReports})`], ['users', 'Users'], ['rides', 'Rides'], ['audit', 'Audit log']]} />
       </div>
 
       {tab === 'overview' && (
@@ -48,7 +48,7 @@ export default function Admin() {
             <div className="kv"><span>Possible duplicate listings</span><b style={{ color: d.dups.length ? 'var(--danger)' : undefined }}>{d.dups.length}</b></div>
             <div className="kv"><span>Pending verifications</span><b>{c.pending}</b></div>
           </div>
-          <div className="note" style={{ marginTop: 12 }}><Icon name="lock" size={18} /> Phone numbers and licence numbers are masked. Every admin action is written to the audit log.</div>
+          <div className="note" style={{ marginTop: 12 }}><Icon name="lock" size={18} /> Emails and phone numbers are masked and ID card photos are deleted after review. Every admin action is written to the audit log.</div>
         </>
       )}
 
@@ -71,26 +71,9 @@ export default function Admin() {
               </div>
             </div>
           ))}
-          {d.queue.length > 0 && <b style={{ marginTop: 8 }}>Ride Giver vehicle & licence</b>}
         </div>
       )}
-      {tab === 'verify' && (d.queue.length ? (
-        <div className="stack">
-          {d.queue.map((u) => (
-            <div key={u.id} className="card">
-              <div className="hstack"><Avatar user={u} size={44} /><div className="grow"><b>{u.name}</b><small style={{ display: 'block' }}>Submitted {u.at ? timeAgo(u.at) : 'earlier'}</small></div></div>
-              <div className="divider" />
-              <div className="kv"><span>Vehicle</span><b>{u.vehicleFull?.color} {u.vehicleFull?.brand} {u.vehicleFull?.model}</b></div>
-              <div className="kv"><span>Registration</span><b>{u.vehicleFull?.reg}</b></div>
-              <div className="kv"><span>Licence no.</span><b>{u.licence || '—'}</b></div>
-              <div className="btn-row" style={{ marginTop: 12 }}>
-                <button className="btn danger-ghost" onClick={() => act(`/admin/verify/${u.id}`, { approve: false }, 'Verification rejected')}>Reject</button>
-                <button className="btn" onClick={() => act(`/admin/verify/${u.id}`, { approve: true }, 'Ride Giver verified ✅')}><Icon name="check" /> Approve</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : !d.workQueue.length && <div className="card"><Empty icon="shield" title="No pending verifications" /></div>)}
+      {tab === 'verify' && !d.workQueue.length && <div className="card"><Empty icon="shield" title="No pending verifications" /></div>}
 
       {tab === 'reports' && (
         <div className="stack">

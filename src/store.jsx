@@ -127,9 +127,9 @@ export function StoreProvider({ children }) {
       toast: showToast,
 
       /* auth */
-      requestOtp: (phone) => post('/auth/otp', { phone }),
-      verifyOtp: async (phone, code) => {
-        const r = await post('/auth/verify', { phone, code });
+      requestOtp: (email) => post('/auth/otp', { email }),
+      verifyOtp: async (email, code) => {
+        const r = await post('/auth/verify', { email, code });
         setToken(r.token);
         setLoading(true);
         setAuthed(true);
@@ -143,7 +143,7 @@ export function StoreProvider({ children }) {
         setAuthed(false);
       },
       updateMe: (patch) => run(() => api('/me', { method: 'PATCH', body: patch })),
-      setRole: (role) => run(() => api('/me', { method: 'PATCH', body: { role } }), role === 'giver' ? 'You are now a Ride Giver 🚗' : 'You are now a Ride Taker 🙋'),
+      setRole: (role) => run(() => api('/me', { method: 'PATCH', body: { role } }), role === 'giver' ? 'You are now a Ride Giver' : 'You are now a Ride Taker'),
       setPref: (path, value) => {
         const [a, b] = path.split('.');
         const body = b ? { [a]: { [b]: value } } : { [a]: value };
@@ -197,7 +197,7 @@ export function StoreProvider({ children }) {
           return { ok: false, error: e.message };
         }
       },
-      submitVehicle: (vehicle, licence) => run(() => post('/me/vehicle', { vehicle, licence })),
+      submitVehicle: (vehicle) => run(() => post('/me/vehicle', { vehicle }), 'Vehicle saved 🚗'),
       joinCommunity: (id) => run(() => post(`/me/communities/${id}`, { join: true }), 'Community joined ✅'),
       leaveCommunity: (id) => run(() => post(`/me/communities/${id}`, { join: false })),
 
@@ -240,10 +240,21 @@ export function StoreProvider({ children }) {
       cancelHelp: (helpId) => run(() => post(`/help/${helpId}/cancel`), 'Glad it is fixed — continuing the ride'),
 
       /* chat, ratings, safety */
+      /** Open the phone's dialer with a co-rider's number (released only to confirmed co-riders). */
+      callUser: async (rideId, userId) => {
+        try {
+          const r = await api(`/rides/${rideId}/contact/${userId}`);
+          window.location.href = 'tel:' + r.phone.replace(/[^\d+]/g, '');
+          return true;
+        } catch (e) {
+          showToast(e.message);
+          return false;
+        }
+      },
       sendChat: (rideId, text) => run(() => post(`/rides/${rideId}/messages`, { text })),
       report: (body) => run(() => post('/reports', body)),
       sosAlert: (rideId) => run(() => post('/sos', { rideId })),
-      createAlert: ({ origin, via }) => run(() => post('/alerts', { origin, via })),
+      createAlert: ({ origin, via, direction }) => run(() => post('/alerts', { origin, via, direction })),
       removeAlert: (id) => run(() => api('/alerts/' + id, { method: 'DELETE' })),
       refresh,
     };
@@ -274,7 +285,7 @@ export function StoreProvider({ children }) {
     extraUsers: extra.users,
     lang: local.lang,
     onboarded: local.onboarded,
-    auth: authed ? { phone: snap?.me?.phone } : null,
+    auth: authed ? { phone: snap?.me?.phone, email: snap?.me?.email } : null,
     toast,
     config,
     version,

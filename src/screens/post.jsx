@@ -31,12 +31,17 @@ export default function PostRide() {
   const [busy, setBusy] = useState(false);
 
   const all = [start, ...points, dest].join(' ');
+  const OFFICE = /hitec|hi[\s-]?tech|cyber|financial|\bfd\b|wipro|icici|gachibowli|nanakramguda|madhapur|mindspace|kokapet/i;
+  const detectedDir = OFFICE.test(start) && !OFFICE.test(dest) ? 'home' : 'work';
+  const homeEnd = detectedDir === 'home' ? dest : start;
   const detected = {
-    origin: /isnapur|patancheru|muthangi/i.test(start) ? 'isnapur' : 'sangareddy',
+    direction: detectedDir,
+    origin: /isnapur|patancheru|muthangi/i.test(homeEnd) ? 'isnapur' : 'sangareddy',
     corridor: /shankar\s*pall/i.test(all) ? 'shankarpally' : 'orr',
   };
-  const base = manual || detected;
+  const base = { ...detected, ...(manual || {}) };
   const route = { ...base, corridor: base.origin === 'isnapur' ? 'orr' : base.corridor };
+  const goingHome = route.direction === 'home';
 
   const when = () => {
     const d = new Date();
@@ -65,7 +70,7 @@ export default function PostRide() {
     const ts = when();
     if (ts < Date.now()) return setErr({ msg: 'That time has already passed. Please pick a later time.' });
     setBusy(true);
-    const res = await postRide({ start, destination: dest, points, time: ts, seats, corridor: route.corridor, origin: route.origin });
+    const res = await postRide({ start, destination: dest, points, time: ts, seats, corridor: goingHome ? route.corridor + '_home' : route.corridor, origin: route.origin });
     setBusy(false);
     if (!res.ok) return setErr({ msg: res.error, id: res.conflictId });
     nav.replace('manage', { rideId: res.id, fresh: true });
@@ -75,31 +80,29 @@ export default function PostRide() {
 
   return (
     <div className="screen">
-      <Header title={t('offerRide')} sub="Sangareddy / Isnapur → Financial District / HITEC City" back={nav.depth > 1} />
+      <Header title={t('offerRide')} sub="Sangareddy / Isnapur ⇄ Financial District / HITEC City" back={nav.depth > 1} />
 
       {!isVerifiedOrPending(state) && <div style={{ marginBottom: 12 }}><VerifyPrompt compact /></div>}
       {!v ? (
         <button className="card" style={{ textAlign: 'left', marginBottom: 12 }} onClick={() => nav.go('page', { page: 'vehicle' })}>
           <div className="hstack">
             <span className="row-ic amber"><Icon name="car" size={20} /></span>
-            <div className="grow"><b>Add your vehicle first</b><small style={{ display: 'block' }}>Registration, model & licence — takes 1 minute</small></div>
+            <div className="grow"><b>Add your vehicle first</b><small style={{ display: 'block' }}>Model, colour & number plate — takes 30 seconds</small></div>
             <Icon name="right" className="muted" />
           </div>
         </button>
-      ) : state.me.verification !== 'verified' && (
-        <div className="note warn" style={{ marginBottom: 12 }}><Icon name="shield" size={18} /><span>Verification {state.me.verification === 'rejected' ? 'needs attention' : 'pending'} — passengers will see that you're not verified yet.</span></div>
-      )}
+      ) : null}
 
       <div className="card">
         <div className="field" style={{ marginTop: 0 }}>
           <label className="label" htmlFor="st">Starting point</label>
-          <input id="st" className="input" placeholder="e.g. Malkapur Chintal" value={start} onChange={(e) => setStart(e.target.value)} maxLength={60} />
+          <input id="st" className="input" placeholder={goingHome ? 'e.g. Wipro Circle' : 'e.g. Malkapur Chintal'} value={start} onChange={(e) => setStart(e.target.value)} maxLength={60} />
         </div>
         <div className="field">
           <label className="label" htmlFor="ds">Destination</label>
-          <input id="ds" className="input" placeholder="e.g. Wipro Circle" value={dest} onChange={(e) => setDest(e.target.value)} maxLength={60} />
+          <input id="ds" className="input" placeholder={goingHome ? 'e.g. Sangareddy New Bus Stand' : 'e.g. Wipro Circle'} value={dest} onChange={(e) => setDest(e.target.value)} maxLength={60} />
           <div className="opts" style={{ padding: '8px 0 0' }}>
-            {['Financial District', 'HITEC City', 'Wipro Circle'].map((d) => <Chip key={d} on={dest === d} onClick={() => setDest(d)}>{d}</Chip>)}
+            {(goingHome ? ['Sangareddy', 'Isnapur', 'Kandi'] : ['Financial District', 'HITEC City', 'Wipro Circle']).map((d) => <Chip key={d} on={dest === d} onClick={() => setDest(d)}>{d}</Chip>)}
           </div>
         </div>
         <div className="field">
@@ -151,14 +154,26 @@ export default function PostRide() {
           {preview.stops.map((s, i) => <span key={i} className="rl-stop">{i > 0 && <span className="rl-sep">›</span>}{s.name}</span>)}
         </div>
         <div className="divider" />
-        <span className="label">Route</span>
+        <span className="label">Direction</span>
+        <Segmented value={route.direction} onChange={(d) => setManual({ ...route, direction: d })} options={[['work', '🏢 To office'], ['home', '🏠 Going home']]} />
+        <span className="label" style={{ marginTop: 10 }}>Route</span>
         <Segmented value={route.corridor} onChange={(c) => setManual({ ...route, corridor: c })}
-          options={route.origin === 'isnapur' ? [['orr', 'Via ORR']] : [['orr', 'Via Isnapur & ORR'], ['shankarpally', 'Via Shankarpally']]} />
-        <span className="label" style={{ marginTop: 10 }}>Starting area</span>
+          options={route.origin === 'isnapur' ? [['orr', 'Via ORR']] : [['orr', goingHome ? 'Via ORR & Isnapur' : 'Via Isnapur & ORR'], ['shankarpally', 'Via Shankarpally']]} />
+        <span className="label" style={{ marginTop: 10 }}>{goingHome ? 'Ending area' : 'Starting area'}</span>
         <Segmented value={route.origin} onChange={(o) => setManual({ ...route, origin: o, corridor: o === 'isnapur' ? 'orr' : route.corridor })} options={[['sangareddy', 'Sangareddy'], ['isnapur', 'Isnapur']]} />
         <small style={{ display: 'block', marginTop: 10 }}>
           Fixed fares: {route.origin === 'sangareddy' ? <>Sangareddy {rupee(fares.sangareddy)}{route.corridor === 'orr' && <> · Isnapur {rupee(fares.isnapur)}</>}</> : <>Isnapur {rupee(fares.isnapur)}</>} per seat
         </small>
+        {(() => {
+          const c = state.config?.corridors?.find((x) => x.id === (goingHome ? route.corridor + '_home' : route.corridor));
+          if (!c?.fixed) return null;
+          const names = (side) => c.fixed.filter((f) => f.side === side).map((f) => f.name).join(' · ');
+          return (
+            <small style={{ display: 'block', marginTop: 6 }}>
+              Ride Takers board at <b>{names(goingHome ? 'office' : 'home')}</b> and get down at <b>{names(goingHome ? 'home' : 'office')}</b> — only the points your route passes.
+            </small>
+          );
+        })()}
       </div>
 
       {err && (

@@ -5,12 +5,12 @@ import { LANGS } from '../i18n';
 
 const SLIDES = [
   { art: '🚗', title: 'Share rides with IT colleagues going your way', text: 'Sangareddy & Isnapur to Financial District / HITEC City — ride with verified IT professionals on your route.' },
-  { art: '🛡️', title: 'Only verified IT professionals', text: 'Everyone verifies their company and ID. Live trip tracking, SOS and in-app chat — your phone number stays private.' },
+  { art: '🛡️', title: 'Only verified IT professionals', text: 'Everyone verifies their company and ID. Live trip tracking, SOS, chat and calls between confirmed co-riders only.' },
   { art: '💸', title: 'Save money on your daily commute', text: 'Transparent cost sharing. Set your office or college route once and get matches every day.' },
 ];
 
 export function Brand() {
-  return <div className="brand"><span className="brand-mark"><Icon name="car" size={19} /></span>Saathi</div>;
+  return <div className="brand"><span className="brand-mark"><Icon name="car" size={19} /></span>SRDPool</div>;
 }
 
 export function Splash() {
@@ -45,15 +45,15 @@ export function Onboarding() {
 
 export function Login() {
   const { requestOtp, verifyOtp } = useStore();
-  const [phone, setPhone] = useState('');
-  const [step, setStep] = useState('phone');
+  const [email, setEmail] = useState('');
+  const [step, setStep] = useState('email');
   const [otp, setOtp] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [devCode, setDevCode] = useState(null);
   const [timer, setTimer] = useState(30);
   const otpRef = useRef(null);
-  const valid = /^[6-9]\d{9}$/.test(phone);
+  const valid = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
 
   useEffect(() => {
     if (step !== 'otp' || timer <= 0) return;
@@ -62,11 +62,11 @@ export function Login() {
   }, [step, timer]);
 
   const send = async () => {
-    if (!valid) return setErr('Enter a valid 10-digit Indian mobile number');
+    if (!valid) return setErr('Enter a valid email address');
     setErr('');
     setBusy(true);
     try {
-      const r = await requestOtp(phone);
+      const r = await requestOtp(email.trim());
       setDevCode(r.devCode || null);
       setStep('otp');
       setTimer(30);
@@ -77,7 +77,7 @@ export function Login() {
   };
   const verify = async (code) => {
     setBusy(true);
-    try { await verifyOtp(phone, code); } catch (e) {
+    try { await verifyOtp(email.trim(), code); } catch (e) {
       setErr(e.message);
       setOtp('');
       setBusy(false);
@@ -93,27 +93,27 @@ export function Login() {
 
   return (
     <div className="onb" style={{ justifyContent: 'flex-start' }}>
-      {step === 'otp' && <button className="icon-btn" onClick={() => setStep('phone')} aria-label="Back"><Icon name="back" size={22} /></button>}
-      {step === 'phone' && <Brand />}
+      {step === 'otp' && <button className="icon-btn" onClick={() => setStep('email')} aria-label="Back"><Icon name="back" size={22} /></button>}
+      {step === 'email' && <Brand />}
       <div style={{ marginTop: 40 }}>
-        {step === 'phone' ? (
+        {step === 'email' ? (
           <>
-            <h1>Enter your mobile number</h1>
-            <p>We'll send a one-time code to verify it. Your number is never shown to other members.</p>
+            <h1>Sign in with your email</h1>
+            <p>We'll email you a one-time code. Use your work email if you like — it helps your company verification.</p>
             <div className="phone-input" style={{ marginTop: 28 }}>
-              <span>🇮🇳 +91</span>
-              <input inputMode="numeric" autoFocus placeholder="98765 43210" value={phone} maxLength={10}
-                onChange={(e) => { setPhone(e.target.value.replace(/\D/g, '')); setErr(''); }}
-                onKeyDown={(e) => e.key === 'Enter' && send()} aria-label="Mobile number" />
+              <span><Icon name="mail" size={19} /></span>
+              <input type="email" inputMode="email" autoComplete="email" autoFocus placeholder="you@company.com" value={email} maxLength={120}
+                onChange={(e) => { setEmail(e.target.value); setErr(''); }}
+                onKeyDown={(e) => e.key === 'Enter' && send()} aria-label="Email address" style={{ fontSize: 16, letterSpacing: 0 }} />
             </div>
             {err && <div className="err">{err}</div>}
-            <button className="btn block" style={{ marginTop: 20 }} onClick={send} disabled={phone.length < 10 || busy}>{busy ? 'Sending…' : 'Send OTP'}</button>
+            <button className="btn block" style={{ marginTop: 20 }} onClick={send} disabled={!valid || busy}>{busy ? 'Sending…' : 'Email me a code'}</button>
             <p className="center" style={{ fontSize: 12.5, marginTop: 18 }}>By continuing you agree to our Terms & Community Guidelines.</p>
           </>
         ) : (
           <>
-            <h1>Verify your number</h1>
-            <p>Enter the 6-digit code sent to <b style={{ color: 'var(--ink)' }}>+91 {phone}</b></p>
+            <h1>Check your email</h1>
+            <p>Enter the 6-digit code we sent to <b style={{ color: 'var(--ink)' }}>{email.trim()}</b>. It may take a minute — check spam too.</p>
             <div className="otp" style={{ marginTop: 28, position: 'relative', gap: 8 }} onClick={() => otpRef.current?.focus()}>
               {[0, 1, 2, 3, 4, 5].map((k) => (
                 <div key={k} className={'otp-box' + (k === Math.min(otp.length, 5) ? ' active' : '')} style={{ width: 46 }}>{otp[k] || ''}</div>
@@ -125,7 +125,7 @@ export function Login() {
             {devCode && (
               <div className="note green" style={{ marginTop: 22 }}>
                 <Icon name="info" size={18} />
-                <span>Development mode — no SMS provider is configured. Your code is <b>{devCode}</b> (also printed in the server console).</span>
+                <span>Development mode — no email service is configured. Your code is <b>{devCode}</b> (also printed in the server console).</span>
               </div>
             )}
             <p className="center" style={{ marginTop: 18, fontSize: 14 }}>
@@ -139,15 +139,16 @@ export function Login() {
 }
 
 export function Setup() {
-  const { updateMe } = useStore();
-  const [name, setName] = useState('');
-  const [age, setAge] = useState('');
+  const { state, updateMe } = useStore();
+  const [name, setName] = useState(state.me?.name || '');
+  const [age, setAge] = useState(state.me?.age ? String(state.me.age) : '');
+  const [phone, setPhone] = useState(state.me?.phone ? state.me.phone.replace(/\D/g, '').slice(-10) : '');
   const [gender, setGender] = useState('');
   const [photo, setPhoto] = useState(null);
   const [role, setRole] = useState('taker');
   const [saving, setSaving] = useState(false);
   const fileRef = useRef(null);
-  const ok = name.trim().length >= 2 && Number(age) >= 18 && Number(age) < 100;
+  const ok = name.trim().length >= 2 && Number(age) >= 18 && Number(age) < 100 && /^[6-9]\d{9}$/.test(phone);
   const pick = (e) => {
     const f = e.target.files?.[0];
     if (f) resizePhoto(f).then(setPhoto);
@@ -173,21 +174,29 @@ export function Setup() {
           </select>
         </div>
       </div>
-      {age && Number(age) < 18 && <div className="err">You must be 18 or older to use Saathi.</div>}
+      {age && Number(age) < 18 && <div className="err">You must be 18 or older to use SRDPool.</div>}
       <div className="field">
-        <span className="label">How will you mostly use Saathi?</span>
+        <label className="label" htmlFor="ph">Mobile number</label>
+        <div className="phone-input" style={{ height: 52 }}>
+          <span>🇮🇳 +91</span>
+          <input id="ph" inputMode="numeric" autoComplete="tel-national" placeholder="98765 43210" value={phone} maxLength={10} onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))} />
+        </div>
+        <small>Only shared with your co-riders when they tap Call on a confirmed ride.</small>
+      </div>
+      <div className="field">
+        <span className="label">How will you mostly use SRDPool?</span>
         <div className="stack">
           <button className={'role-card' + (role === 'taker' ? ' on' : '')} onClick={() => setRole('taker')}>
-            <span className="emoji">🙋</span><span><b>Ride Taker</b><small>I need a seat in someone's car</small></span>
+            <span className="emoji"><Icon name="rider" size={28} /></span><span><b>Ride Taker</b><small>I need a seat in someone's car</small></span>
           </button>
           <button className={'role-card' + (role === 'giver' ? ' on' : '')} onClick={() => setRole('giver')}>
-            <span className="emoji">🚗</span><span><b>Ride Giver</b><small>I drive and have empty seats to share</small></span>
+            <span className="emoji"><Icon name="wheel" size={28} /></span><span><b>Ride Giver</b><small>I drive and have empty seats to share</small></span>
           </button>
         </div>
         <small style={{ display: 'block', marginTop: 8 }}>You can switch anytime from your profile.</small>
       </div>
       <button className="btn block" style={{ marginTop: 24 }} disabled={!ok || saving}
-        onClick={async () => { setSaving(true); await updateMe({ name: name.trim(), age: Number(age), gender, photo, role }); setSaving(false); }}>
+        onClick={async () => { setSaving(true); await updateMe({ name: name.trim(), age: Number(age), gender, photo, role, phone }); setSaving(false); }}>
         {saving ? 'Saving…' : 'Continue'}
       </button>
     </div>

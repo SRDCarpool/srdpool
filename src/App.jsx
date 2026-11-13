@@ -32,7 +32,8 @@ function TabBar({ current, go }) {
       {tabs.map(([name, icon, label]) => (
         <button key={name} className={'tab' + (current === name ? ' on' : '') + (name === 'post' ? ' post' : '')} onClick={() => go(name)} aria-current={current === name ? 'page' : undefined}>
           <span className="tab-ic pill">
-            <Icon name={icon} size={name === 'post' ? 24 : 22} stroke={name === 'post' ? 2.6 : 2} />
+            <Icon name={name === 'post' ? 'wheel' : icon} size={name === 'post' ? 26 : 22} stroke={2} />
+            {name === 'post' && <span className="post-plus"><Icon name="plus" size={12} stroke={3.2} /></span>}
             {name === 'rides' && pending > 0 && <span className="count">{pending}</span>}
           </span>
           {t(label)}
@@ -61,7 +62,7 @@ export function SOSSheet({ open, onClose, rideId }) {
   const share = async () => {
     const where = ride?.live ? ` Live location: https://maps.google.com/?q=${ride.live.lat.toFixed(5)},${ride.live.lng.toFixed(5)}` : '';
     const veh = ride?.vehicle ? ` Vehicle: ${ride.vehicle.color} ${ride.vehicle.brand} ${ride.vehicle.model} ${ride.vehicle.reg}.` : '';
-    const text = `I'm on a Saathi carpool ride.${veh}${where}`;
+    const text = `I'm on a SRDPool carpool ride.${veh}${where}`;
     try {
       if (navigator.share) await navigator.share({ title: 'My live trip', text });
       else { await navigator.clipboard.writeText(text); toast('Trip details copied', 'Paste them to a trusted contact'); }
@@ -111,7 +112,7 @@ export default function App() {
   if (!state.onboarded) return <div className="app"><Onboarding /></div>;
   if (!state.auth) return <div className="app"><Login /></div>;
   if (state.loading && !state.me?.id) return <div className="app"><Splash /></div>;
-  if (!state.me?.name) return <div className="app"><Setup /></div>;
+  if (!state.me?.name || !state.me?.phone) return <div className="app"><Setup /></div>;
 
   const Screen = SCREENS[cur.name] || Home;
   const isTab = stack.length === 1 && TABS.some(([n]) => n === cur.name);
@@ -120,7 +121,7 @@ export default function App() {
   return (
     <NavCtx.Provider value={{ ...nav, openRide, depth: stack.length }}>
       <div className="app">
-        {(!netOnline || !state.online) && <div className="offline"><Icon name="wifi" size={16} /> {netOnline ? 'Reconnecting to Saathi…' : "You're offline"} · showing saved booking details</div>}
+        {(!netOnline || !state.online) && <div className="offline"><Icon name="wifi" size={16} /> {netOnline ? 'Reconnecting to SRDPool…' : "You're offline"} · showing saved booking details</div>}
         <Screen key={stack.length + cur.name} {...cur.params} />
         {isTab && <TabBar current={cur.name} go={nav.tab} />}
         <Toast onOpen={openRide} />

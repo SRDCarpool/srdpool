@@ -14,7 +14,6 @@ export function Profile() {
   const me = getUser(state, 'me');
   const fileRef = useRef(null);
   const go = (page) => nav.go('page', { page });
-  const ver = { none: ['Not submitted', 'gray'], pending: ['Under review', 'gold'], verified: ['Verified', 'green'], rejected: ['Action needed', 'red'] }[state.me.verification];
   const pickPhoto = (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -33,7 +32,7 @@ export function Profile() {
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickPhoto} />
         <h2>{me.name}</h2>
         <div className="hstack" style={{ gap: 6 }}>
-          <span className="badge green"><Icon name="phone" size={12} /> {state.auth.phone}</span>
+          <span className="badge green"><Icon name="mail" size={12} /> {state.auth.email}</span>
           <Badges user={me} />
         </div>
       </div>
@@ -42,17 +41,16 @@ export function Profile() {
         <div className="stat"><b>{me.cancellations}</b><small>cancellations</small></div>
         <div className="stat"><b>{reliability}%</b><small>reliability</small></div>
       </div>
-      {!me.trusted && <div className="note" style={{ marginTop: 12 }}><Icon name="star" size={18} /><span>Complete 5+ rides with very few cancellations to earn the <b>Trusted Member</b> badge.</span></div>}
 
       <div className="section">
         <span className="label">I am currently a</span>
-        <Segmented value={state.me.role} onChange={setRole} options={[['taker', '🙋 Ride Taker'], ['giver', '🚗 Ride Giver']]} />
+        <Segmented value={state.me.role} onChange={setRole} options={[['taker', ['rider', 'Ride Taker']], ['giver', ['wheel', 'Ride Giver']]]} />
       </div>
 
       <div className="card menu" style={{ marginTop: 16 }}>
         <Row icon="shield" title="Verification" sub={state.me.work?.company ? `${state.me.work.designation} · ${state.me.work.company}` : 'Company details & ID card'} onClick={() => go('verify')} right={<span className={'badge sm ' + ({ verified: 'green', pending: 'gold', rejected: 'red' }[state.me.work?.status] || 'gray')}>{{ verified: 'Verified', pending: 'Under review', rejected: 'Action needed' }[state.me.work?.status] || 'Not done'}</span>} />
         <Row icon="user" title="Edit profile" sub="Name, age, bio, contact" onClick={() => go('edit')} />
-        <Row icon="car" title="Vehicle & verification" sub={state.me.vehicle ? `${state.me.vehicle.brand} ${state.me.vehicle.model}` : 'Required to offer rides'} onClick={() => go('vehicle')} right={<span className={'badge sm ' + ver[1]}>{ver[0]}</span>} />
+        <Row icon="car" title="Your vehicle" sub={state.me.vehicle ? `${state.me.vehicle.color} ${state.me.vehicle.brand} ${state.me.vehicle.model} · ${state.me.vehicle.reg}` : 'Needed to offer rides'} onClick={() => go('vehicle')} />
         <Row icon="heart" title="Favourite members" sub={`${state.favorites.length} favourites`} onClick={() => go('favorites')} />
         <Row icon="bell" title="Ride alerts" sub={`${state.alerts.length} active`} onClick={() => go('alerts')} />
       </div>
@@ -73,7 +71,7 @@ export function Profile() {
         {state.admin && <Row icon="grid" title="Admin dashboard" sub="Verifications, reports, users & rides" onClick={() => nav.go('admin')} />}
         <Row icon="logout" title="Log out" danger onClick={logout} right={null} />
       </div>
-      <p className="center muted" style={{ fontSize: 12, marginTop: 18 }}>Saathi v0.1 · demo build</p>
+      <p className="center muted" style={{ fontSize: 12, marginTop: 18 }}>SRDPool v0.1 · demo build</p>
     </div>
   );
 }
@@ -86,7 +84,7 @@ export function ProfilePage({ page }) {
 function EditProfile() {
   const { state, updateMe, toast } = useStore();
   const nav = useNav();
-  const [f, setF] = useState({ name: state.me.name, age: state.me.age, bio: state.me.bio || '', email: state.me.email || '', gender: state.me.gender || '' });
+  const [f, setF] = useState({ name: state.me.name, age: state.me.age, bio: state.me.bio || '', phone: (state.me.phone || '').replace(/\D/g, '').slice(-10), gender: state.me.gender || '' });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   return (
     <>
@@ -97,9 +95,9 @@ function EditProfile() {
         <div><label className="label">Gender</label><select className="input select" value={f.gender} onChange={set('gender')}><option value="">Prefer not to say</option><option>Female</option><option>Male</option><option>Other</option></select></div>
       </div>
       <div className="field"><label className="label">About you</label><textarea className="input" placeholder="e.g. Software engineer, love music, always on time" value={f.bio} onChange={set('bio')} /></div>
-      <div className="field"><label className="label">Mobile number</label><input className="input" value={state.auth.phone} disabled /><small>Verified via OTP · never shown to other members</small></div>
-      <div className="field"><label className="label">Email (for receipts)</label><input className="input" type="email" value={f.email} onChange={set('email')} placeholder="you@example.com" /></div>
-      <button className="btn block" style={{ marginTop: 20 }} disabled={f.name.trim().length < 2} onClick={() => { updateMe({ ...f, name: f.name.trim() }); toast('Profile updated'); nav.back(); }}>Save</button>
+      <div className="field"><label className="label" htmlFor="ep">Mobile number</label><div className="phone-input" style={{ height: 52 }}><span>🇮🇳 +91</span><input id="ep" inputMode="numeric" value={f.phone} maxLength={10} onChange={(e) => setF({ ...f, phone: e.target.value.replace(/\D/g, '') })} /></div><small>Only shared with co-riders when they tap Call on a confirmed ride</small></div>
+      <div className="field"><label className="label">Email</label><input className="input" value={state.auth.email || ''} disabled /><small>Used to sign in · not shown to other members</small></div>
+      <button className="btn block" style={{ marginTop: 20 }} disabled={f.name.trim().length < 2} onClick={async () => { const r = await updateMe({ ...f, name: f.name.trim() }); if (r) { toast('Profile updated'); nav.back(); } }}>Save</button>
     </>
   );
 }
@@ -109,42 +107,22 @@ function Vehicle() {
   const nav = useNav();
   const v = state.me.vehicle || {};
   const [f, setF] = useState({ brand: v.brand || '', model: v.model || '', color: v.color || '', reg: v.reg || '', type: v.type || 'Sedan' });
-  const [lic, setLic] = useState('');
-  const [docs, setDocs] = useState({ licence: !!state.me.licence, rc: !!state.me.vehicle });
   const set = (k) => (e) => setF({ ...f, [k]: k === 'reg' ? e.target.value.toUpperCase() : e.target.value });
-  const ok = f.brand && f.model && f.color && /^[A-Z]{2}\s?\d{1,2}\s?[A-Z]{0,3}\s?\d{3,4}$/.test(f.reg.trim()) && lic.length >= 8 && docs.licence && docs.rc;
-  const st = state.me.verification;
+  const ok = f.brand && f.model && f.color && /^[A-Z]{2}\s?\d{1,2}\s?[A-Z]{0,3}\s?\d{3,4}$/.test(f.reg.trim());
   return (
     <>
-      <Header title="Vehicle & verification" />
-      {st === 'pending' && <div className="note warn"><Icon name="clock" size={18} /><span>Your documents are under review. {state.admin ? <>You can approve it from <b>Profile → Admin dashboard</b>.</> : 'We will notify you once it is reviewed.'}</span></div>}
-      {st === 'verified' && <div className="note green"><Icon name="shield" size={18} /><span>You're a verified Ride Giver. Changing your vehicle will need a quick re-check.</span></div>}
-      {st === 'rejected' && <div className="note danger"><Icon name="alert" size={18} /><span>Documents were unclear. Please re-upload and submit again.</span></div>}
+      <Header title="Your vehicle" sub="Helps Ride Takers find the right car" />
       <div className="field"><span className="label">Vehicle type</span><div className="opts" style={{ padding: 0 }}>{VEHICLE_TYPES.map((x) => <Chip key={x} on={f.type === x} onClick={() => setF({ ...f, type: x })}>{x}</Chip>)}</div></div>
       <div className="field field-row">
-        <div><label className="label">Brand</label><input className="input" placeholder="Maruti" value={f.brand} onChange={set('brand')} /></div>
-        <div><label className="label">Model</label><input className="input" placeholder="Swift" value={f.model} onChange={set('model')} /></div>
+        <div><label className="label" htmlFor="vb">Brand</label><input id="vb" className="input" placeholder="Maruti" value={f.brand} onChange={set('brand')} /></div>
+        <div><label className="label" htmlFor="vm">Model</label><input id="vm" className="input" placeholder="Swift" value={f.model} onChange={set('model')} /></div>
       </div>
       <div className="field field-row">
-        <div><label className="label">Colour</label><input className="input" placeholder="White" value={f.color} onChange={set('color')} /></div>
-        <div><label className="label">Registration no.</label><input className="input" placeholder="TS 09 AB 1234" value={f.reg} onChange={set('reg')} /></div>
+        <div><label className="label" htmlFor="vc">Colour</label><input id="vc" className="input" placeholder="White" value={f.color} onChange={set('color')} /></div>
+        <div><label className="label" htmlFor="vr">Registration no.</label><input id="vr" className="input" placeholder="TS 09 AB 1234" value={f.reg} onChange={set('reg')} /></div>
       </div>
-      <div className="field"><label className="label">Driving licence number</label><input className="input" placeholder="TS0920190001234" value={lic} onChange={(e) => setLic(e.target.value.toUpperCase())} /></div>
-      <div className="field">
-        <span className="label">Documents</span>
-        <div className="check-list">
-          {[['licence', 'Driving licence (front & back)'], ['rc', 'Vehicle RC & insurance']].map(([k, label]) => (
-            <label key={k} className={'check-item' + (docs[k] ? ' on' : '')} style={{ cursor: 'pointer' }}>
-              <span className="box">{docs[k] && <Icon name="check" size={14} stroke={3} />}</span>
-              <span className="grow">{label}<small style={{ display: 'block', fontWeight: 500 }}>{docs[k] ? 'Uploaded ✓' : 'Tap to upload photo'}</small></span>
-              <Icon name="camera" size={18} className="muted" />
-              <input type="file" accept="image/*,application/pdf" hidden onChange={(e) => e.target.files?.length && setDocs({ ...docs, [k]: true })} />
-            </label>
-          ))}
-        </div>
-      </div>
-      <small style={{ display: 'block', marginTop: 10 }}><Icon name="lock" size={12} /> Documents are encrypted and seen only by the verification team.</small>
-      <button className="btn block" style={{ marginTop: 18 }} disabled={!ok} onClick={() => { submitVehicle({ ...f, reg: f.reg.trim() }, lic); nav.back(); }}>Submit for verification</button>
+      <small style={{ display: 'block', marginTop: 10 }}><Icon name="lock" size={12} /> The full number plate is shown only to Ride Takers with a confirmed seat.</small>
+      <button className="btn block" style={{ marginTop: 18 }} disabled={!ok} onClick={async () => { await submitVehicle({ ...f, reg: f.reg.trim() }); nav.back(); }}>Save vehicle</button>
     </>
   );
 }
@@ -185,7 +163,7 @@ function Alerts() {
         <Toggle checked={state.holidayMode} onChange={setHoliday} label="Pause alerts" />
       </div>
       {state.alerts.length ? (
-        <div className="card menu">{state.alerts.map((a) => <Row key={a.id} icon="bell" title={`New rides from ${a.origin === 'isnapur' ? 'Isnapur' : 'Sangareddy'}`} sub={`${a.via === 'shankarpally' ? 'Via Shankarpally' : a.via === 'orr' ? 'Via ORR' : 'Any route'} · since ${fmtDay(a.at)}`} right={<button className="icon-btn" onClick={() => removeAlert(a.id)} aria-label="Delete alert"><Icon name="trash" size={18} /></button>} />)}</div>
+        <div className="card menu">{state.alerts.map((a) => <Row key={a.id} icon="bell" title={a.direction === 'home' ? `Rides home to ${a.origin === 'isnapur' ? 'Isnapur' : 'Sangareddy'}` : `Rides from ${a.origin === 'isnapur' ? 'Isnapur' : 'Sangareddy'} to office`} sub={`${a.via === 'shankarpally' ? 'Via Shankarpally' : a.via === 'orr' ? 'Via ORR' : 'Any route'} · since ${fmtDay(a.at)}`} right={<button className="icon-btn" onClick={() => removeAlert(a.id)} aria-label="Delete alert"><Icon name="trash" size={18} /></button>} />)}</div>
       ) : <div className="card"><Empty icon="bell" title="No ride alerts" text="In Find Ride, tap “Notify me” to get an alert when a Ride Giver posts a ride from Sangareddy or Isnapur." /></div>}
     </>
   );
@@ -225,7 +203,7 @@ function Privacy() {
       <div className="card stack">
         <div className="hstack"><div className="grow"><b>Share live location during rides</b><small style={{ display: 'block' }}>Only with confirmed co-riders, only while a ride is active</small></div><Toggle checked={state.prefs.shareLocation} onChange={(v) => setPref('shareLocation', v)} label="Share location" /></div>
         <div className="divider" style={{ margin: 0 }} />
-        <div className="hstack"><div className="grow"><b>Show my phone number</b><small style={{ display: 'block' }}>Off = calls use a masked number (recommended)</small></div><Toggle checked={state.prefs.showPhone} onChange={(v) => setPref('showPhone', v)} label="Show phone number" /></div>
+        <div className="hstack"><div className="grow"><b>Let co-riders call me</b><small style={{ display: 'block' }}>Your number is shared only with people on your confirmed ride, when they tap Call. Off = chat only.</small></div><Toggle checked={state.prefs.allowCalls !== false} onChange={(v) => setPref('allowCalls', v)} label="Let co-riders call me" /></div>
       </div>
       <div className="list-label">Blocked members</div>
       {state.blocked.length ? (
@@ -278,7 +256,7 @@ function Payments() {
         </div>
       ) : <div className="card"><p className="muted">No payments yet.</p></div>}
       <button className="btn outline block" style={{ marginTop: 14 }} onClick={() => setIssue(true)}><Icon name="flag" /> Report a payment issue</button>
-      <div className="note" style={{ marginTop: 12 }}><Icon name="info" size={18} /> Saathi only facilitates cost sharing between co-riders. UPI payments are processed by your bank app.</div>
+      <div className="note" style={{ marginTop: 12 }}><Icon name="info" size={18} /> SRDPool only facilitates cost sharing between co-riders. UPI payments are processed by your bank app.</div>
       <Sheet open={issue} onClose={() => setIssue(false)} title="Payment issue">
         <textarea className="input" placeholder="Describe the issue — which ride, amount, UPI reference…" id="pi" />
         <button className="btn block" style={{ marginTop: 12 }} onClick={() => { report({ targetId: 'me', type: 'Payment issue', details: document.getElementById('pi').value }); setIssue(false); }}>Submit</button>
@@ -328,9 +306,9 @@ function Help() {
     ['How do I book a ride?', 'Search your route, open a ride, and tap “Request to book”. The Ride Giver accepts and you get a notification.'],
     ['How is the fare decided?', 'Fares are fixed: ₹150 from Sangareddy and ₹120 from Isnapur, per seat. It is cost sharing between colleagues — no profit and no platform fee.'],
     ['What if the Ride Giver cancels?', 'You get a full refund and we suggest other rides on your route.'],
-    ['Is my phone number shared?', 'No. Chat and calls work through the app with masked numbers.'],
-    ['Who can join Saathi?', 'Only working IT professionals. Everyone verifies their company, designation and ID card before riding.'],
-    ['How do I become a verified Ride Giver?', 'Profile → Vehicle & verification. Upload your licence and RC — usually approved within 24 hours.'],
+    ['Is my phone number shared?', 'Only with the Ride Giver or Ride Takers on your confirmed ride, when they tap Call. You can turn calls off in Profile → Privacy & location and use chat instead.'],
+    ['Who can join SRDPool?', 'Only working IT professionals. Everyone verifies their company, designation and ID card before riding.'],
+    ['How do I offer rides?', 'Switch to Ride Giver, add your vehicle in Profile → Your vehicle, then use Post Ride. Your company verification is all that is needed.'],
   ];
   return (
     <>
@@ -339,7 +317,7 @@ function Help() {
         {faqs.map(([q, a]) => <details key={q} className="card"><summary style={{ fontWeight: 700, cursor: 'pointer' }}>{q}</summary><p className="muted" style={{ marginTop: 8, fontSize: 14 }}>{a}</p></details>)}
       </div>
       <div className="btn-row" style={{ marginTop: 16 }}>
-        <a className="btn outline" href="mailto:support@saathi.example"><Icon name="chat" /> Contact us</a>
+        <a className="btn outline" href="mailto:support@srdpool.example"><Icon name="chat" /> Contact us</a>
         <button className="btn danger-ghost" onClick={logout}>Log out</button>
       </div>
     </>

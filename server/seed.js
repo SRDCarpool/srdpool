@@ -1,7 +1,7 @@
 // Demo members (bots) and their rides, so a single tester can try every flow.
 // Disable with DEMO_BOTS=0.
 import { Users, Rides, Bookings, Reports, uid } from './db.js';
-import { FARES, placeStops, rideShape } from './corridors.js';
+import { CORRIDORS, FARES, buildStops, rideShape, suggestPickup, suggestDrop } from './corridors.js';
 import { newUser } from './engine.js';
 
 const COMPANY = { u_ravi: 'Wipro', u_priya: 'Microsoft', u_arjun: 'ICICI Bank', u_sneha: 'Wipro', u_vikram: 'Deloitte', u_ananya: 'Amazon', u_kiran: 'Infosys', u_meera: 'TCS', u_rahul: 'HCL' };
@@ -42,34 +42,47 @@ const dayAt = (off, h, m) => { const d = new Date(); d.setDate(d.getDate() + off
 const next = (h, m) => (dayAt(0, h, m) > Date.now() + 20 * MIN ? dayAt(0, h, m) : dayAt(1, h, m));
 const soon = (mins) => Math.ceil((Date.now() + mins * MIN) / (5 * MIN)) * 5 * MIN;
 
-// [driver, corridor, origin, typed stops (start … destination), time, seats, riders]
-const TEMPLATES = () => [
-  ['u_ravi', 'orr', 'sangareddy', ['Sangareddy New Bus Stand', 'Pothireddypally', 'Kandi (IIT)', 'Rudraram', 'Isnapur X Road', 'Patancheru ORR', 'Wipro Circle', 'HITEC City'], soon(60), 3, [['u_rahul', 0, 'sangareddy']]],
+// [Ride Giver, corridor, home area, typed stops (start … destination), time, seats, riders [id, pickupIdx, dropIdx?, area]]
+const TO_WORK = () => [
+  ['u_ravi', 'orr', 'sangareddy', ['Sangareddy New Bus Stand', 'Pothireddypally', 'Kandi (IIT)', 'Rudraram', 'Isnapur X Road', 'Patancheru ORR', 'Wipro Circle', 'HITEC City'], soon(60), 3, [['u_rahul', 0, null, 'sangareddy']]],
   ['u_sneha', 'orr', 'sangareddy', ['Malkapur Chintal', 'SRD X Road', 'ORR', 'ICICI', 'Wipro Circle'], soon(45), 3, []],
   ['u_priya', 'shankarpally', 'sangareddy', ['Sangareddy X Road', 'Shankarpally', 'Mokila', 'Financial District', 'HITEC City (Cyber Towers)'], soon(90), 3, []],
   ['u_arjun', 'orr', 'isnapur', ['Isnapur', 'Muthangi', 'Patancheru ORR', 'Nanakramguda', 'Financial District'], soon(120), 3, []],
-  ['u_vikram', 'orr', 'sangareddy', ['Sangareddy Old Bus Stand', 'Kandi', 'Isnapur', 'ORR', 'ICICI Towers', 'HITEC City'], next(8, 0), 2, [['u_kiran', 0, 'sangareddy'], ['u_meera', 2, 'isnapur']]],
+  ['u_vikram', 'orr', 'sangareddy', ['Sangareddy Old Bus Stand', 'Kandi', 'Isnapur', 'ORR', 'ICICI Towers', 'HITEC City'], next(8, 0), 2, [['u_kiran', 0, null, 'sangareddy'], ['u_meera', 2, null, 'isnapur']]],
   ['u_ananya', 'shankarpally', 'sangareddy', ['Sangareddy', 'Shankarpally', 'Kokapet', 'Wipro Circle'], next(8, 30), 3, []],
   ['u_ravi', 'orr', 'sangareddy', ['Sangareddy New Bus Stand', 'Kandi (IIT)', 'Isnapur X Road', 'ORR', 'Wipro Circle', 'HITEC City'], next(9, 15), 3, []],
   ['u_arjun', 'orr', 'isnapur', ['Isnapur X Road', 'Patancheru', 'ORR', 'Financial District', 'Gachibowli', 'HITEC City'], next(9, 0), 4, []],
 ];
+// Evening return trips: Financial District / HITEC City → home.
+const GOING_HOME = () => [
+  ['u_vikram', 'orr_home', 'sangareddy', ['HITEC City', 'Gachibowli', 'Financial District', 'ORR', 'Isnapur', 'Kandi', 'Sangareddy Old Bus Stand'], soon(75), 3, [['u_kiran', 0, 6, 'sangareddy']]],
+  ['u_sneha', 'orr_home', 'sangareddy', ['Wipro Circle', 'ICICI', 'ORR', 'SRD X Road', 'Malkapur Chintal'], next(18, 0), 3, []],
+  ['u_ravi', 'orr_home', 'sangareddy', ['HITEC City', 'Wipro Circle', 'Patancheru ORR', 'Isnapur X Road', 'Kandi (IIT)', 'Sangareddy New Bus Stand'], next(18, 30), 3, []],
+  ['u_arjun', 'orr_home', 'isnapur', ['Financial District', 'Nanakramguda', 'Patancheru ORR', 'Muthangi', 'Isnapur'], next(18, 45), 3, []],
+  ['u_priya', 'shankarpally_home', 'sangareddy', ['HITEC City (Cyber Towers)', 'Financial District', 'Mokila', 'Shankarpally', 'Sangareddy X Road'], next(19, 0), 3, []],
+  ['u_ananya', 'shankarpally_home', 'sangareddy', ['Wipro Circle', 'Kokapet', 'Shankarpally', 'Sangareddy'], next(19, 30), 3, []],
+];
 
-/** Keep a fresh set of upcoming demo rides on the fixed corridors. */
+function insertTemplate([driverId, corridor, origin, names, time, seats, riders]) {
+  const stops = buildStops(corridor, names);
+  const ride = Rides.insert({
+    id: uid('r_'), driverId, corridor, direction: CORRIDORS[corridor].direction, origin, stops, ...rideShape(corridor, stops), fixedV: 3,
+    time, flex: 15, seats, price: FARES[origin], prefs: [], recurring: 'none', community: null, notes: '', status: 'scheduled',
+    posKm: 0, delayMin: 0, vehicle: Users.get(driverId).vehicle, createdAt: Date.now(),
+  });
+  for (const [pid, , , o] of riders) {
+    Bookings.insert({ id: uid('b_'), rideId: ride.id, passengerId: pid, seats: 1, pickupIdx: suggestPickup(ride, o), dropIdx: suggestDrop(ride, o), origin: o, status: 'confirmed', amount: FARES[o], paid: false, createdAt: Date.now() });
+  }
+}
+
+/** Keep fresh upcoming demo rides in both directions. */
 export async function refreshDemoRides() {
   ensureBots();
   const upcoming = Rides.where('status = \'scheduled\' AND time > ?', Date.now() + 20 * MIN)
-    .filter((r) => r.corridor && Users.get(r.driverId)?.isBot && !r.demo);
-  if (upcoming.length >= 5) return;
-  for (const [driverId, corridor, origin, names, time, seats, riders] of TEMPLATES()) {
-    const stops = placeStops(corridor, names);
-    const ride = Rides.insert({
-      id: uid('r_'), driverId, corridor, origin, stops, ...rideShape(corridor, stops),
-      time, flex: 15, seats, price: FARES[origin], prefs: [], recurring: 'none', community: null, notes: '', status: 'scheduled',
-      posKm: 0, delayMin: 0, vehicle: Users.get(driverId).vehicle, createdAt: Date.now(),
-    });
-    for (const [pid, pickupIdx, o] of riders) {
-      Bookings.insert({ id: uid('b_'), rideId: ride.id, passengerId: pid, seats: 1, pickupIdx, dropIdx: names.length - 1, origin: o, status: 'confirmed', amount: FARES[o], paid: false, createdAt: Date.now() });
-    }
-  }
-  console.log('[seed] demo rides refreshed');
+    .filter((r) => CORRIDORS[r.corridor] && Users.get(r.driverId)?.isBot && !r.demo);
+  const count = (dir) => upcoming.filter((r) => CORRIDORS[r.corridor].direction === dir).length;
+  let added = 0;
+  if (count('work') < 5) { TO_WORK().forEach(insertTemplate); added++; }
+  if (count('home') < 3) { GOING_HOME().forEach(insertTemplate); added++; }
+  if (added) console.log('[seed] demo rides refreshed');
 }

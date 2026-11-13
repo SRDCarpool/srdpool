@@ -1,0 +1,40 @@
+# Render Blueprint — New → Blueprint → pick this repo.
+# Builds the Dockerfile, mounts a persistent disk for the SQLite database,
+# and asks you for the secret values on first deploy.
+services:
+  - type: web
+    name: srdpool
+    runtime: docker
+    plan: starter            # a paid plan is required for a persistent disk
+    region: singapore        # closest Render region to Hyderabad
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    autoDeploy: true
+    disk:
+      name: srdpool-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /data
+      - key: TZ_NAME
+        value: Asia/Kolkata
+      - key: DEMO_BOTS
+        value: "0"
+      - key: GEO_USER_AGENT
+        value: SRDPool-carpool/1.0
+      # Brevo SMTP (Brevo → SMTP & API → SMTP)
+      - key: SMTP_HOST
+        value: smtp-relay.brevo.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false          # your Brevo SMTP login, e.g. 8a1b2c001@smtp-brevo.com
+      - key: SMTP_PASS
+        sync: false          # your Brevo SMTP key
+      - key: MAIL_FROM
+        sync: false          # e.g. SRDPool <your-verified-sender@gmail.com>
+      - key: ADMIN_EMAILS
+        sync: false          # your email(s), comma-separated

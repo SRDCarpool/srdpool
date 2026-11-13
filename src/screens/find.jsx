@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore, useAsync, getUser, myBooking, seatsLeft, rideById } from '../store';
 import { Header, Icon, Chip, Segmented, Stepper, Sheet, RideCard, Empty, Avatar, Badges, MapView, StatusSteps, RouteLine, VIA, useNav } from '../ui';
 import { fmtTime, fmtDay, first, rupee, etaMin, km, distKm } from '../geo';
@@ -16,23 +16,29 @@ const ORIGIN_NAMES = { sangareddy: 'Sangareddy', isnapur: 'Isnapur' };
 export const useFares = () => useStore().state.config?.fares || DEFAULT_FARES;
 const lastOrigin = () => { try { return localStorage.getItem('saathi-origin') || 'sangareddy'; } catch { return 'sangareddy'; } };
 
-/** Corridor preview map for the taker's chosen route. */
-function CorridorMap({ via, origin }) {
+/** Corridor preview map for the Ride Taker's chosen direction and route. */
+function CorridorMap({ via, origin, direction }) {
   const { state } = useStore();
-  const id = origin === 'isnapur' || via === 'any' ? 'orr' : via;
+  const base = origin === 'isnapur' || via === 'any' ? 'orr' : via;
+  const id = direction === 'home' ? base + '_home' : base;
   const c = state.config?.corridors?.find((x) => x.id === id);
   if (!c) return null;
   const wp = c.waypoints || [];
   let stops = wp, geometry = c.geometry;
   if (origin === 'isnapur') {
+    // Only show the part between Isnapur and FD/HITEC City.
     const isn = wp.find((w) => w.name === 'Isnapur');
-    stops = wp.slice(wp.indexOf(isn));
+    const k = wp.indexOf(isn);
     let best = 0, bd = Infinity;
     c.geometry.forEach(([lat, lng], i) => { const d = distKm({ lat, lng }, isn); if (d < bd) { bd = d; best = i; } });
-    geometry = c.geometry.slice(best);
+    if (direction === 'home') { stops = wp.slice(0, k + 1); geometry = c.geometry.slice(0, best + 1); }
+    else { stops = wp.slice(k); geometry = c.geometry.slice(best); }
   }
   return <MapView ride={{ id: 'corridor-' + id + origin, stops: stops.map((s) => ({ ...s, pos: 0 })), geometry }} height={170} />;
 }
+
+export const lastDirection = () => { try { return localStorage.getItem('saathi-direction') || 'work'; } catch { return 'work'; } };
+export const saveDirection = (d) => { try { localStorage.setItem('saathi-direction', d); } catch { /* ignore */ } };
 
 export function FindRide() {
   const { state, search, createAlert } = useStore();
@@ -40,50 +46,60 @@ export function FindRide() {
   const t = useT();
   const fares = useFares();
   const [origin, setOriginState] = useState(lastOrigin);
+  const [direction, setDirectionState] = useState(lastDirection);
   const [via, setVia] = useState('any');
   const [day, setDay] = useState(0);
   const [time, setTime] = useState('');
+  const home = direction === 'home';
   const setOrigin = (o) => { setOriginState(o); if (o === 'isnapur') setVia('any'); try { localStorage.setItem('saathi-origin', o); } catch { /* ignore */ } };
+  const setDirection = (d) => { setDirectionState(d); saveDirection(d); };
 
-  const q = { origin, via: origin === 'isnapur' ? 'orr' : via, date: dayTs(day), time, window: time ? 45 : 0 };
-  const res = useAsync(() => search(q), [origin, via, day, time]);
+  const q = { origin, direction, via: origin === 'isnapur' ? 'orr' : via, date: dayTs(day), time, window: time ? 45 : 0 };
+  const res = useAsync(() => search(q), [origin, direction, via, day, time]);
   const list = res.data || [];
   const main = list.filter((r) => !r.outside);
   const alts = list.filter((r) => r.outside).slice(0, 3);
-  const hasAlert = state.alerts.some((a) => a.origin === origin && (a.via || 'any') === q.via);
-  const open = (r) => nav.go('ride', { rideId: r.ride.id, origin, pickupIdx: r.pickupIdx });
+  const hasAlert = state.alerts.some((a) => a.origin === origin && (a.via || 'any') === q.via && (a.direction || 'work') === direction);
+  const open = (r) => nav.go('ride', { rideId: r.ride.id, origin, pickupIdx: r.pickupIdx, dropIdx: r.dropIdx });
+  const card = (r) => <RideCard key={r.ride.id} ride={r.ride} fare={r.fare} pickupIdx={r.pickupIdx} dropIdx={r.dropIdx} fav={r.fav} onClick={() => open(r)} />;
+
+  const FixedEnd = (
+    <div className="hstack">
+      <span className={'pdot ' + (home ? 'green' : 'red')} />
+      <div className="grow"><small style={{ display: 'block', fontWeight: 600 }}>{home ? 'BOARD AT' : 'DESTINATION'}</small><b>Financial District / HITEC City</b></div>
+      <Icon name="lock" size={16} className="muted" />
+    </div>
+  );
 
   return (
     <div className="screen">
       <Header title={t('findRide')} sub="Fixed route · fixed fare" back={nav.depth > 1} />
 
-      <span className="label">Where do you board?</span>
+      <Segmented value={direction} onChange={setDirection} options={[['work', '🏢 To office'], ['home', '🏠 Going home']]} />
+
+      <span className="label" style={{ marginTop: 14 }}>{home ? 'Where do you get down?' : 'Where do you board?'}</span>
       <div className="stack">
         {['sangareddy', 'isnapur'].map((o) => (
           <button key={o} className={'origin-card' + (origin === o ? ' on' : '')} onClick={() => setOrigin(o)} aria-pressed={origin === o}>
-            <span className="row-ic green"><Icon name="pin" size={20} /></span>
-            <span><b style={{ fontSize: 16, display: 'block' }}>{ORIGIN_NAMES[o]}</b><small>to Financial District / HITEC City</small></span>
+            <span className="row-ic green"><Icon name={home ? 'home' : 'pin'} size={20} /></span>
+            <span><b style={{ fontSize: 16, display: 'block' }}>{ORIGIN_NAMES[o]}</b><small>{home ? 'from Financial District / HITEC City' : 'to Financial District / HITEC City'}</small></span>
             <span className="fare">{rupee(fares[o])}</span>
           </button>
         ))}
       </div>
 
       <div className="card" style={{ marginTop: 12 }}>
-        <div className="hstack">
-          <span className="pdot red" />
-          <div className="grow"><small style={{ display: 'block', fontWeight: 600 }}>DESTINATION</small><b>Financial District / HITEC City</b></div>
-          <Icon name="lock" size={16} className="muted" />
-        </div>
+        {FixedEnd}
         <div className="divider" />
         <span className="label">Route</span>
         {origin === 'sangareddy' ? (
           <Segmented value={via} onChange={setVia} options={[['any', 'Any route'], ['orr', 'Via ORR'], ['shankarpally', 'Via Shankarpally']]} />
         ) : (
-          <div className="note green"><Icon name="nav" size={18} /><span>From Isnapur, rides take the <b>ORR</b> (Isnapur → Patancheru ORR → Financial District).</span></div>
+          <div className="note green"><Icon name="nav" size={18} /><span>Isnapur rides use the <b>ORR</b> ({home ? 'Financial District → Patancheru ORR → Isnapur' : 'Isnapur → Patancheru ORR → Financial District'}).</span></div>
         )}
-        {origin === 'sangareddy' && via === 'shankarpally' && <small style={{ display: 'block', marginTop: 8 }}>Alternative route: Sangareddy → Shankarpally → Mokila → Financial District → HITEC City</small>}
-        {origin === 'sangareddy' && via === 'orr' && <small style={{ display: 'block', marginTop: 8 }}>Sangareddy → Kandi → Isnapur → Patancheru ORR → Financial District → HITEC City</small>}
-        <div style={{ marginTop: 12 }}><CorridorMap via={via} origin={origin} /></div>
+        {origin === 'sangareddy' && via === 'shankarpally' && <small style={{ display: 'block', marginTop: 8 }}>Alternative route: {home ? 'HITEC City → Financial District → Mokila → Shankarpally → Sangareddy' : 'Sangareddy → Shankarpally → Mokila → Financial District → HITEC City'}</small>}
+        {origin === 'sangareddy' && via === 'orr' && <small style={{ display: 'block', marginTop: 8 }}>{home ? 'HITEC City → Financial District → Patancheru ORR → Isnapur → Kandi → Sangareddy' : 'Sangareddy → Kandi → Isnapur → Patancheru ORR → Financial District → HITEC City'}</small>}
+        <div style={{ marginTop: 12 }}><CorridorMap via={via} origin={origin} direction={direction} /></div>
         <div className="opts" style={{ padding: '12px 0 0' }}>
           <Chip on={day === 0} onClick={() => setDay(0)}>Today</Chip>
           <Chip on={day === 1} onClick={() => setDay(1)}>Tomorrow</Chip>
@@ -101,26 +117,24 @@ export function FindRide() {
       <div className="section">
         <div className="section-head"><h3>{res.loading && !res.data ? 'Looking for rides…' : `${main.length} ride${main.length !== 1 ? 's' : ''} · ${fmtDay(dayTs(day))}`}</h3></div>
         {res.error && <div className="note danger"><Icon name="alert" size={18} /> {res.error.message}</div>}
-        <div className="stack">
-          {main.map((r) => <RideCard key={r.ride.id} ride={r.ride} fare={r.fare} pickupIdx={r.pickupIdx} fav={r.fav} onClick={() => open(r)} />)}
-        </div>
+        <div className="stack">{main.map(card)}</div>
         {alts.length > 0 && (
           <div className="section">
             <div className="section-head"><h3>Other times</h3></div>
-            <div className="stack">{alts.map((r) => <RideCard key={r.ride.id} ride={r.ride} fare={r.fare} pickupIdx={r.pickupIdx} fav={r.fav} onClick={() => open(r)} />)}</div>
+            <div className="stack">{alts.map(card)}</div>
           </div>
         )}
         {!main.length && !res.loading && (
           <div className="card">
-            <Empty icon="bell" title={`No rides from ${ORIGIN_NAMES[origin]} yet`}
+            <Empty icon="bell" title={home ? `No rides home to ${ORIGIN_NAMES[origin]} yet` : `No rides from ${ORIGIN_NAMES[origin]} yet`}
               text="Turn on an alert and we'll notify you as soon as a Ride Giver posts one."
-              action={<button className="btn block" disabled={hasAlert} onClick={() => createAlert({ origin, via: q.via })}><Icon name="bell" /> {hasAlert ? 'Alert is on' : 'Notify me'}</button>} />
+              action={<button className="btn block" disabled={hasAlert} onClick={() => createAlert({ origin, via: q.via, direction })}><Icon name="bell" /> {hasAlert ? 'Alert is on' : 'Notify me'}</button>} />
           </div>
         )}
         {main.length > 0 && !hasAlert && (
-          <button className="row" style={{ marginTop: 12 }} onClick={() => createAlert({ origin, via: q.via })}>
+          <button className="row" style={{ marginTop: 12 }} onClick={() => createAlert({ origin, via: q.via, direction })}>
             <span className="row-ic blue"><Icon name="bell" size={18} /></span>
-            <span className="row-txt"><b>Notify me about new rides from {ORIGIN_NAMES[origin]}</b><small>Get an alert when a Ride Giver posts</small></span>
+            <span className="row-txt"><b>Notify me about new rides {home ? `home to ${ORIGIN_NAMES[origin]}` : `from ${ORIGIN_NAMES[origin]}`}</b><small>Get an alert when a Ride Giver posts</small></span>
           </button>
         )}
       </div>
@@ -148,17 +162,16 @@ export function CancelSheet({ open, onClose, onConfirm, title = 'Cancel booking'
   );
 }
 
-export function CallSheet({ open, onClose, user }) {
-  const { toast } = useStore();
-  return (
-    <Sheet open={open} onClose={onClose} title={`Call ${first(user?.name)}`}>
-      <div className="note green"><Icon name="lock" size={18} /><span>Calls are connected through a masked number. Neither of you sees the other's real phone number.</span></div>
-      <button className="btn block" style={{ marginTop: 16 }} onClick={() => { toast('Masked calling is not connected yet', 'Use in-app chat for now'); onClose(); }}>
-        <Icon name="phone" /> Call securely
-      </button>
-    </Sheet>
-  );
+/** Tapping Call opens the phone's dialer with the co-rider's number. */
+export function CallSheet({ open, onClose, user, rideId }) {
+  const { callUser } = useStore();
+  useEffect(() => {
+    if (!open || !user || !rideId) return;
+    callUser(rideId, user.id).finally(onClose);
+  }, [open]); // eslint-disable-line
+  return null;
 }
+
 
 /** Ride from state, or fetched from the API when it isn't part of my snapshot. */
 export function useRide(rideId) {
@@ -168,7 +181,7 @@ export function useRide(rideId) {
   return { ride: rideById(state, rideId), loading: !inSnap && res.loading && !rideById(state, rideId), error: res.error };
 }
 
-export function RideDetail({ rideId, origin: originParam, pickupIdx: pIdx }) {
+export function RideDetail({ rideId, origin: originParam, pickupIdx: pIdx, dropIdx: dIdx }) {
   const { state, requestBooking, joinWaitlist, leaveWaitlist, cancelBooking, demoStartRide, toggleFavorite, pay } = useStore();
   const nav = useNav();
   const t = useT();
@@ -188,10 +201,17 @@ export function RideDetail({ rideId, origin: originParam, pickupIdx: pIdx }) {
   const b = myBooking(state, ride.id);
   const activeB = b && ['requested', 'confirmed', 'picked', 'completed'].includes(b.status) ? b : null;
   const onWait = b?.status === 'waitlist';
-  const origin = activeB?.origin || originParam || (ride.origin === 'isnapur' ? 'isnapur' : 'sangareddy');
+  // Ride Takers board / get down only at the fixed points the ride passes.
+  const goingHome = ride.corridor?.endsWith('_home');
+  const sides = goingHome ? { board: 'office', drop: 'home' } : { board: 'home', drop: 'office' };
+  const boardOpts = stops.map((s, i) => i).filter((i) => i < stops.length - 1 && stops[i].fixed && stops[i].side === sides.board);
+  const pi = activeB?.pickupIdx ?? pick ?? (boardOpts.includes(pIdx) ? pIdx : boardOpts[0] ?? 0);
+  const dropOpts = stops.map((s, i) => i).filter((i) => i > pi && stops[i].fixed && stops[i].side === sides.drop);
+  const di = activeB?.dropIdx ?? (dropOpts.includes(drop) ? drop : dropOpts.includes(dIdx) ? dIdx : dropOpts.at(-1) ?? stops.length - 1);
+  const homeStop = stops[sides.board === 'home' ? pi : di];
+  const origin = activeB?.origin || (homeStop?.fixed === 'Isnapur' ? 'isnapur' : homeStop?.fixed ? 'sangareddy' : originParam || 'sangareddy');
   const fare = fares[origin];
-  const pi = activeB?.pickupIdx ?? pick ?? pIdx ?? 0;
-  const di = activeB?.dropIdx ?? (drop != null && drop > pi ? drop : stops.length - 1);
+  const areaFare = (s) => fares[s.fixed === 'Isnapur' ? 'isnapur' : 'sangareddy'];
   const left = seatsLeft(state, ride);
   const fav = state.favorites.includes(ride.driverId);
   const confirmed = activeB && ['confirmed', 'picked', 'completed'].includes(activeB.status);
@@ -199,7 +219,7 @@ export function RideDetail({ rideId, origin: originParam, pickupIdx: pIdx }) {
   const pickupEta = ride.time + (stops[pi].pos - stops[0].pos > 0.5 ? etaMin(stops[pi].pos - stops[0].pos, ride) * 60000 : 0);
   const late = ride.time - Date.now() < 60 * 60000;
   const doBook = async () => { setBusy(true); await requestBooking({ rideId: ride.id, pickupIdx: pi, dropIdx: di, seats, note, origin }); setBusy(false); };
-  const canChoose = !activeB && ride.status === 'scheduled';
+  const canChoose = !activeB && ride.status === 'scheduled' && boardOpts.length > 0 && dropOpts.length > 0;
 
   return (
     <div className="screen no-tab">
@@ -233,11 +253,11 @@ export function RideDetail({ rideId, origin: originParam, pickupIdx: pIdx }) {
             <div className="divider" />
             <span className="label">Board at</span>
             <div className="opts" style={{ padding: 0 }}>
-              {stops.slice(0, -1).map((s, i) => <Chip key={i} on={pi === i} onClick={() => { setPick(i); if (drop != null && drop <= i) setDrop(null); }}>{s.name}</Chip>)}
+              {boardOpts.map((i) => <Chip key={i} on={pi === i} onClick={() => setPick(i)}>{stops[i].fixed}{sides.board === 'home' && <small className="chip-fare">{rupee(areaFare(stops[i]))}</small>}</Chip>)}
             </div>
             <span className="label" style={{ marginTop: 12 }}>Get down at</span>
             <div className="opts" style={{ padding: 0 }}>
-              {stops.map((s, i) => i > pi && <Chip key={i} on={di === i} onClick={() => setDrop(i)}>{s.name}</Chip>)}
+              {dropOpts.map((i) => <Chip key={i} on={di === i} onClick={() => setDrop(i)}>{stops[i].fixed}{sides.drop === 'home' && <small className="chip-fare">{rupee(areaFare(stops[i]))}</small>}</Chip>)}
             </div>
           </>
         )}
@@ -271,7 +291,7 @@ export function RideDetail({ rideId, origin: originParam, pickupIdx: pIdx }) {
 
       <div className="card" style={{ marginTop: 12 }}>
         <b>Fare</b>
-        <div className="kv" style={{ marginTop: 6 }}><span>Fixed fare from {ORIGIN_NAMES[origin]}</span><span>{rupee(fare)} / seat</span></div>
+        <div className="kv" style={{ marginTop: 6 }}><span>Fixed fare {ride.corridor?.endsWith('_home') ? 'to' : 'from'} {ORIGIN_NAMES[origin]}</span><span>{rupee(fare)} / seat</span></div>
         <div className="kv"><span>Seats</span><span>× {activeB ? activeB.seats : seats}</span></div>
         <div className="kv total"><span>Total</span><span>{rupee(activeB ? activeB.amount : fare * seats)}</span></div>
         {activeB && <div className="hstack" style={{ marginTop: 6 }}><span className={'badge ' + (activeB.paid ? 'green' : 'gray')}>{activeB.paid ? 'Paid' : 'Payment pending'}</span><small>Pay by UPI or cash</small></div>}
@@ -326,7 +346,7 @@ export function RideDetail({ rideId, origin: originParam, pickupIdx: pIdx }) {
 
       <CancelSheet open={cancel} onClose={() => setCancel(false)} onConfirm={(r) => cancelBooking(activeB.id, r)}
         policy={late ? 'Departure is within 1 hour — 50% of the fare may be retained if already paid.' : 'Free cancellation — you are more than 1 hour before departure.'} />
-      <CallSheet open={call} onClose={() => setCall(false)} user={driver} />
+      <CallSheet open={call} onClose={() => setCall(false)} user={driver} rideId={ride.id} />
     </div>
   );
 }
@@ -358,7 +378,7 @@ export function DriverProfile({ userId }) {
       {u.bio && <div className="card" style={{ marginTop: 12 }}><p>{u.bio}</p></div>}
       <div className="card menu" style={{ marginTop: 12 }}>
         <div className="row"><span className="row-ic green"><Icon name="phone" size={18} /></span><span className="row-txt"><b>Mobile number verified</b></span><Icon name="check" className="muted" /></div>
-        {u.vehicle && <div className="row"><span className={'row-ic ' + (u.verified ? 'green' : 'amber')}><Icon name="shield" size={18} /></span><span className="row-txt"><b>Driving licence & vehicle</b><small>{u.verified ? 'Verified by Saathi' : 'Verification in progress'}</small></span>{u.verified && <Icon name="check" className="muted" />}</div>}
+        <div className="row"><span className={'row-ic ' + (u.workVerified ? 'green' : 'amber')}><Icon name="shield" size={18} /></span><span className="row-txt"><b>{u.workVerified ? `Works at ${u.company}` : 'Company verification'}</b><small>{u.workVerified ? 'ID verified by SRDPool' : 'In progress'}</small></span>{u.workVerified && <Icon name="check" className="muted" />}</div>
         {u.vehicle && <div className="row"><span className="row-ic"><Icon name="car" size={18} /></span><span className="row-txt"><b>{u.vehicle.color} {u.vehicle.brand} {u.vehicle.model}</b><small>{u.vehicle.type}</small></span></div>}
       </div>
       {u.together?.length > 0 && (

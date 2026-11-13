@@ -1,23 +1,23 @@
-# Saathi — Ride Together 🚗
+# SRDPool — Ride Together 🚗
 
-A friendly, mobile-first carpooling app **only for IT professionals**, on one commuter corridor:
-**Sangareddy / Isnapur → Financial District / HITEC City.**
+A friendly, mobile-first carpooling app **only for IT professionals**, on one commuter corridor, both ways:
+**Sangareddy / Isnapur ⇄ Financial District / HITEC City.**
 
 | Ride Takers see | Ride Givers see |
 |---|---|
-| Fixed routes and fixed fares only: **Sangareddy ₹150**, **Isnapur ₹120** per seat. Destination is always Financial District / HITEC City | A simple form: starting point, destination, date, time, seats, then **pickup points** in order. Passengers see it as one line, e.g. `9:00 AM Malkapur Chintal › SRD X Road › ORR › ICICI › Wipro Circle` |
-| Route choice from Sangareddy: **Via Isnapur & ORR** or the alternative **Via Shankarpally**. Isnapur riders always use the ORR route | The app detects the route (ORR or Shankarpally) and starting area (Sangareddy or Isnapur) from what they type; they can correct it with one tap |
+**To office** or **Going home**, then fixed fares by home area: **Sangareddy ₹150**, **Isnapur ₹120** per seat, in either direction. The office end is always Financial District / HITEC City | A simple form: starting point, destination, date, time, seats, then **pickup points** in order. Passengers see it as one line, e.g. `9:00 AM Malkapur Chintal › SRD X Road › ORR › ICICI › Wipro Circle` |
+| Route choice for Sangareddy: **via Isnapur & ORR** or the alternative **via Shankarpally**. Isnapur riders always use the ORR route | The app detects the direction (to office / going home), route (ORR or Shankarpally) and home area (Sangareddy or Isnapur) from what they type; they can correct each with one tap |
 
-There is no rating system. Trust comes from OTP-verified phones, member verification, Ride Giver vehicle/licence verification, ride counts, cancellations and a reliability score.
+There is no rating system. Trust comes from OTP-verified phones, member verification (company, designation and ID card), ride counts, cancellations and a reliability score.
 
 The top of **Home** has an *I am currently a [Ride Taker] [Ride Giver]* switch.
 
 ### Breakdown help (moving passengers to other rides)
 
-If a car has a problem during a live ride (flat tyre, engine trouble, accident, out of fuel…), the Ride Giver taps **Car trouble? Ask nearby Ride Givers for help** on the live ride screen.
+If a car has a problem during a live ride (flat tyre, engine trouble, accident, out of fuel…), the Ride Giver taps **Car trouble? Ask nearby Ride Givers for help** on the live ride screen. Nothing is sent unless they tap it.
 
 1. The car is marked as stopped and passengers are told a seat is being found for them.
-2. Saathi alerts Ride Givers whose rides **pass the breakdown spot, haven't passed it yet, are live or leave within 75 minutes, and have empty seats**. They see a red 🆘 card on Home and an alert with the spot on a map.
+2. SRDPool alerts only Ride Givers who are **live right now, travelling the same direction, behind the breakdown spot (haven't passed it), and have empty seats**. They see a red 🆘 card on Home and an alert with the spot on a map. Once a helper drives past the spot, the card disappears for them, and requests close automatically when the broken-down ride ends.
 3. A helper taps **Offer seats**. Passengers are moved to the helper's ride automatically: a 🆘 pickup stop is added at the broken-down car, and each passenger is dropped at the helper's stop closest to where they were going. They pay the helper the same fare, and any earlier payment is refunded.
 4. Passengers get the new car's colour, model and number plate. The first Ride Giver sees who helped, and can end the ride, or tap **Problem fixed — continue ride** if the car is repaired.
 
@@ -41,33 +41,45 @@ npm run dev
 This starts the API on `:8787` and the app on http://localhost:5173 (Vite proxies `/api` and `/ws`).
 Use a phone-width window (or DevTools device mode).
 
-**Login:** any 10-digit Indian mobile number. Without an SMS provider configured, the 6-digit OTP is shown on screen and printed in the API console.
+**Login:** any email address. Without an email service configured (development), the 6-digit code is shown on screen and printed in the API console. Setup then asks for a mobile number.
 Switch between Ride Taker and Ride Giver in **Profile**: takers get the *Find Ride* tab, givers get *Post Ride*.
 
 Requires Node.js 22.5+ (for `node:sqlite`; tested on Node 24).
 
-## Routes and fares
+## Routes, boarding points and fares
 
-Defined in [`server/corridors.js`](server/corridors.js):
+Defined in [`server/corridors.js`](server/corridors.js).
 
-| Route | Path | Serves | Fare |
-|---|---|---|---|
-| Via Isnapur & ORR | Sangareddy → Kandi → Rudraram → Isnapur → Patancheru ORR → Financial District → HITEC City | Sangareddy, Isnapur | ₹150 / ₹120 |
-| Via Shankarpally (alternative) | Sangareddy → Shankarpally → Mokila → Financial District → HITEC City | Sangareddy | ₹150 |
+Ride Takers can only board and get down at these fixed points:
 
-Fares are per seat, set by where the passenger boards, and charged by the server (Ride Givers don't set prices).
-Ride Givers' typed pickup points are placed along the route using known landmarks (SRD X Road, Kandi, Isnapur, Patancheru, ORR, Kollur, Shankarpally, Mokila, ICICI, Wipro Circle, Financial District, Gachibowli, HITEC City…); unknown names are spaced evenly between them. To add landmarks or change fares, edit `LANDMARKS` / `FARES` in that file.
+| Direction | Board at | Get down at |
+|---|---|---|
+| To office | Sangareddy, SRD X Road, Kandi, Isnapur | GAR, Cyient Signal, Capgemini, ICICI, Wipro Circle, Gachibowli, HITEC City |
+| Going home | HITEC City, Gachibowli, Wipro Circle, ICICI, Capgemini, Cyient Signal, GAR | Isnapur, Kandi, SRD X Road, Sangareddy |
+
+**Fares** are per seat and follow the home-side point: **Isnapur ₹120**; Sangareddy, SRD X Road and Kandi **₹150**. The server works out the fare from the chosen point, so the app can't change it, and Ride Givers don't set prices.
+
+| Route | Path | Home points it passes |
+|---|---|---|
+| To office · via Isnapur & ORR | Sangareddy → SRD X Road → Kandi → Isnapur → Patancheru ORR → GAR → … → HITEC City | all four |
+| To office · via Shankarpally | Sangareddy → SRD X Road → (Kandi) → Shankarpally → Mokila → GAR → … → HITEC City | Sangareddy, SRD X Road, Kandi |
+| Going home · via ORR & Isnapur | HITEC City → … → GAR → Patancheru ORR → Isnapur → Kandi → SRD X Road → Sangareddy | all four |
+| Going home · via Shankarpally | HITEC City → … → GAR → Mokila → Shankarpally → Kandi → SRD X Road → Sangareddy | Kandi, SRD X Road, Sangareddy |
+
+Every posted ride automatically includes the fixed points its route passes between the Ride Giver's start and destination, even if they didn't type them. Typed names that match a fixed point (e.g. "Sangareddy New Bus Stand", "ICICI Towers") count as that point. The route line passengers see shows the Ride Giver's own points, plus the rider's chosen board / get-down points. Rides created before this change are upgraded automatically when the server starts.
+
+The office-side coordinates (GAR, Cyient Signal, Capgemini, ICICI…) are approximate. If one sits in the wrong place, adjust `OFFICE_POINTS` in `server/corridors.js`. Other typed pickup points are placed using known landmarks (Patancheru, ORR, Kollur, Shankarpally, Mokila…), and unknown names are spaced evenly between them.
 
 ## How it works
 
 | Area | Implementation |
 |---|---|
-| Auth | Mobile OTP (hashed, 5-min expiry, 5 attempts, 30 s resend limit, per-IP rate limits) → 90-day session token |
+| Auth | Email OTP (hashed, 10-min expiry, 5 attempts, 30 s resend limit, per-IP rate limits) → 90-day session token; mobile number collected at setup for calls |
 | Search | Passenger picks Sangareddy or Isnapur (+ route, date, optional time). Server returns rides on routes serving that origin, with the suggested boarding point and fixed fare |
 | Booking | Passenger chooses where to board and get down from the Ride Giver's pickup points; total = fare × seats |
 | Live tracking | The Ride Giver's phone streams GPS over WebSocket → snapped to the route → pushed only to confirmed passengers. Approaching/arrived/dropped notifications are server-side |
 | Realtime | WebSocket per user: `sync` (refetch), `notification` (toast), `live` (car position) |
-| Privacy | Number plates are masked until a booking is confirmed; live location only for confirmed riders; phone numbers never leave the server |
+| Privacy | Number plates are masked until a booking is confirmed; live location only for confirmed riders; a phone number is released only to a co-rider on the same confirmed ride when they tap Call (members can turn calls off) |
 | Jobs | 1 s tick (simulated drives), 15 s housekeeping (expiry, reminders 30 min before departure) |
 | Admin | Verification queue, reports, suspensions, listing removal, duplicate detection, audit log |
 
@@ -86,29 +98,44 @@ Demo members (Ravi, Priya, Arjun…) are bots that keep fresh rides on both rout
 
 ## Configuration
 
-Copy `.env.example` to `.env` and run with `node --env-file=.env server/index.js`. Key settings:
+Copy `.env.example` to `.env` (or set the same values in your host's dashboard). Key settings:
 
-- `TWILIO_*`: real SMS for OTP and SOS alerts (MSG91 etc. can replace `server/sms.js`)
-- `ADMIN_PHONES` + `NODE_ENV=production`: lock the admin panel to listed numbers and hide dev OTPs
-- `OSRM_URL`, `TILE_URL`: the free public OpenStreetMap services are for **development only** (usage limits apply). For launch, self-host OSRM or use a provider (MapTiler, Stadia, Mapbox, Google)
+- `SMTP_*`, `MAIL_FROM`: **required in production** — sign-in codes are emailed. Any SMTP provider works (Google Workspace / Gmail app password, Zoho, Brevo, Amazon SES). Without them, development prints codes on screen and in the console; production refuses to sign anyone in.
+- `ADMIN_EMAILS`: comma-separated emails that get the admin dashboard.
+- `TWILIO_*`: optional, for SOS text messages to trusted contacts.
+- `DATA_DIR`: where the SQLite database lives — must be a persistent disk.
+- `OSRM_URL`, `TILE_URL`: the free public OpenStreetMap services are for light use only. For real traffic, self-host OSRM or use a provider (MapTiler, Stadia, Mapbox, Google).
 
-## Production build
+## Sign-in and calling
+
+- **Sign up / sign in:** members enter their email and get a 6-digit code (10-minute expiry, 5 attempts, 30-second resend limit, per-IP rate limits) → 90-day session. During setup they add their **mobile number for communication**.
+- **Call button:** opens the phone's dialer (`tel:`) with the other member's number. The number is released only between the Ride Giver and a Ride Taker with a **confirmed seat on the same upcoming or live ride**. Members can switch calls off in *Profile → Privacy & location* (chat only). Demo members can't be called.
+
+## Publishing
+
+The app is one Node server (API + WebSockets + the built web app) with a SQLite database file, so any host that runs a Docker container **with a persistent disk** works — e.g. Render, Railway, Fly.io, DigitalOcean App Platform or a small VPS.
 
 ```bash
-npm run build
-NODE_ENV=production PORT=8080 node server/index.js
+docker build -t srdpool .
+docker run -p 8080:8080 -v srdpool-data:/data --env-file .env srdpool
 ```
 
-The API serves the built app from `dist/`. Put it behind HTTPS (required for GPS and installable PWA).
+Checklist:
+1. Fill in `.env` (at least `SMTP_*`, `MAIL_FROM`, `ADMIN_EMAILS`); keep `NODE_ENV=production` and `DEMO_BOTS=0`.
+2. Mount a persistent volume at `/data` (the database lives there; back it up).
+3. Serve over **HTTPS** with your domain — browsers only allow GPS (live tracking) on HTTPS. Most hosts provide this automatically.
+4. Health check: `GET /healthz`.
+5. Sign in with an `ADMIN_EMAILS` address to review member verifications in the admin dashboard.
 
-## Still to connect before launch
+Without Docker: `npm ci && npm run build && NODE_ENV=production PORT=8080 node --env-file=.env server/index.js`.
+
+## Still to connect
 
 - **Payments:** UPI is recorded in test mode. Plug Razorpay/Cashfree into `pay()` in `server/engine.js` and add webhooks for refunds
-- **Push notifications:** currently in-app (WebSocket). Add FCM/APNs for background alerts
-- **Masked calling:** UI is ready; connect Exotel/Twilio Proxy in `CallSheet`
-- **Document uploads:** licence/RC photos are only acknowledged; store them in encrypted object storage for reviewers
+- **Push notifications:** currently in-app (WebSocket). Add FCM/APNs for alerts when the app is closed
 - **Database:** SQLite is fine for a pilot; move to PostgreSQL for scale
 - **Native apps:** wrap with Capacitor or port screens to React Native for background GPS while driving
+- **Legal:** add Terms, a Privacy Policy (you store emails, phone numbers and — briefly — ID photos) and a support contact before inviting members
 
 ## Project structure
 
@@ -121,7 +148,8 @@ server/
   state.js      per-user snapshot (what the app renders)
   realtime.js   WebSocket channels
   seed.js       demo members & rides
-  sms.js        OTP/SOS SMS (Twilio or console)
+  mail.js       sign-in code emails (SMTP or console)
+  sms.js        SOS text messages (Twilio or console)
   db.js         SQLite tables
 src/
   api.js        fetch + WebSocket client

@@ -17,8 +17,8 @@ export function meify(value, userId) {
 export function privateMe(u) {
   return {
     id: u.id, phone: u.phone, name: u.name, age: u.age, gender: u.gender, photo: u.photo, bio: u.bio, email: u.email, role: u.role,
-    vehicle: u.vehicle, licence: u.licence ? u.licence.slice(0, 4) + '••••' + u.licence.slice(-3) : '', verification: u.verification,
-    verificationAt: u.verificationAt, work: u.work || { status: 'none' }, isAdmin: !!u.isAdmin, lastPostAt: u.lastPostAt, suspended: !!u.suspended,
+    vehicle: u.vehicle,
+    work: u.work || { status: 'none' }, isAdmin: !!u.isAdmin, lastPostAt: u.lastPostAt, suspended: !!u.suspended,
   };
 }
 

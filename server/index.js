@@ -8,18 +8,26 @@ import * as E from './engine.js';
 import { buildState, meify } from './state.js';
 import { attachRealtime, sync } from './realtime.js';
 import { CITY } from './geo.js';
-import { FARES, servesOrigin, suggestPickup, loadCorridors, publicCorridors } from './corridors.js';
-import { sendOtp, smsConfigured } from './sms.js';
+import { FARES, CORRIDORS, servesOrigin, suggestPickup, suggestDrop, loadCorridors, publicCorridors } from './corridors.js';
+import { smsConfigured } from './sms.js';
+import { sendEmailOtp, mailConfigured } from './mail.js';
 import { refreshDemoRides } from './seed.js';
 
 const PROD = process.env.NODE_ENV === 'production';
 const PORT = Number(process.env.API_PORT || (PROD && process.env.PORT) || 8787);
-const ADMIN_PHONES = (process.env.ADMIN_PHONES || '').split(',').map((s) => s.replace(/\D/g, '')).filter(Boolean);
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
 const OPEN_ADMIN = !PROD && process.env.OPEN_ADMIN !== '0'; // dev: everyone can open the admin demo
 const COMMUNITIES = ['hitec_park', 'jntu', 'myhome'];
 
 const app = express();
 app.disable('x-powered-by');
+if (PROD) app.set('trust proxy', 1); // behind the host's HTTPS proxy: use the real client IP for rate limits
+app.use((req, res, next) => {
+  res.set({ 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin', 'X-Frame-Options': 'DENY' });
+  if (PROD) res.set('Strict-Transport-Security', 'max-age=15552000');
+  next();
+});
+app.get('/healthz', (req, res) => res.json({ ok: true }));
 app.use(express.json({ limit: '3mb' }));
 
 /* ---------------- helpers ---------------- */
@@ -34,6 +42,7 @@ const h = (fn) => async (req, res) => {
   }
 };
 const idOf = (req, x) => (x === 'me' ? req.user.id : x);
+const maskEmail = (e = '') => { const [a, d] = String(e).split('@'); return d ? a.slice(0, 2) + '•••@' + d : ''; };
 
 function userFromToken(token) {
   if (!token) return null;
@@ -71,38 +80,46 @@ function limit(key, max, windowMs) {
 
 /* ---------------- public ---------------- */
 app.get('/api/config', (req, res) => res.json({
-  demo: E.DEMO, city: CITY, sms: smsConfigured, ...publicCorridors(),
+  demo: E.DEMO, city: CITY, sms: smsConfigured, email: mailConfigured, ...publicCorridors(),
   tiles: { url: process.env.TILE_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', attribution: process.env.TILE_ATTRIBUTION || '© OpenStreetMap contributors' },
 }));
 
+const cleanEmail = (e) => String(e || '').trim().toLowerCase().slice(0, 120);
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+// Sign-in: a one-time code is emailed; the mobile number is collected during setup for calls.
 app.post('/api/auth/otp', limit('otp', 5, 60000), h(async (req) => {
-  const digits = String(req.body.phone || '').replace(/\D/g, '').slice(-10);
-  if (!/^[6-9]\d{9}$/.test(digits)) throw new E.HttpError(400, 'Enter a valid 10-digit Indian mobile number');
-  const phone = '+91 ' + digits;
-  const prev = Otps.get(phone);
+  const email = cleanEmail(req.body.email);
+  if (!EMAIL_RE.test(email)) throw new E.HttpError(400, 'Enter a valid email address');
+  if (PROD && !mailConfigured) throw new E.HttpError(503, 'Sign-in emails are not set up yet. Please try again later.');
+  const key = 'email:' + email;
+  const prev = Otps.get(key);
   if (prev && Date.now() - prev.sentAt < 30000) throw new E.HttpError(429, 'Please wait 30 seconds before requesting a new code');
   const code = String(crypto.randomInt(0, 1e6)).padStart(6, '0');
-  Otps.save({ id: phone, hash: sha(phone + code), expires: Date.now() + 5 * 60000, attempts: 0, sentAt: Date.now() });
-  await sendOtp(phone, code);
-  return { ok: true, phone, devCode: !PROD && !smsConfigured ? code : undefined };
+  Otps.save({ id: key, hash: sha(key + code), expires: Date.now() + 10 * 60000, attempts: 0, sentAt: Date.now() });
+  try { await sendEmailOtp(email, code); } catch (e) {
+    console.error('[mail]', e.message);
+    throw new E.HttpError(502, "We couldn't send the email. Check the address and try again.");
+  }
+  return { ok: true, email, devCode: !PROD && !mailConfigured ? code : undefined };
 }));
 
 app.post('/api/auth/verify', limit('verify', 10, 60000), h(async (req) => {
-  const digits = String(req.body.phone || '').replace(/\D/g, '').slice(-10);
-  const phone = '+91 ' + digits;
-  const o = Otps.get(phone);
+  const email = cleanEmail(req.body.email);
+  const key = 'email:' + email;
+  const o = Otps.get(key);
   if (!o || o.expires < Date.now()) throw new E.HttpError(400, 'Code expired. Request a new one.');
   if (o.attempts >= 5) throw new E.HttpError(429, 'Too many wrong attempts. Request a new code.');
-  if (sha(phone + String(req.body.code || '')) !== o.hash) {
+  if (sha(key + String(req.body.code || '').trim()) !== o.hash) {
     o.attempts++;
     Otps.save(o);
     throw new E.HttpError(400, 'Incorrect code. Please try again.');
   }
-  Otps.remove(phone);
-  let user = Users.where('phone = ?', phone)[0];
+  Otps.remove(key);
+  let user = Users.where('email = ?', email)[0];
   const isNew = !user;
-  if (!user) user = Users.insert(E.newUser(phone));
-  if (ADMIN_PHONES.includes(digits) && !user.isAdmin) { user.isAdmin = true; Users.save(user); }
+  if (!user) user = Users.insert(E.newUser(email));
+  if (ADMIN_EMAILS.includes(email) && !user.isAdmin) { user.isAdmin = true; Users.save(user); }
   const token = crypto.randomBytes(32).toString('base64url');
   Sessions.insert({ id: sha(token), userId: user.id, createdAt: Date.now(), expires: Date.now() + 90 * 864e5 });
   return { token, isNew };
@@ -122,7 +139,12 @@ app.patch('/api/me', h((req) => {
   const p = req.body;
   if (p.name != null) { const n = String(p.name).trim(); if (n.length < 2) throw new E.HttpError(400, 'Enter your name'); u.name = n.slice(0, 60); }
   if (p.age != null) { const a = Number(p.age); if (!(a >= 18 && a < 100)) throw new E.HttpError(400, 'You must be 18 or older'); u.age = a; }
-  for (const k of ['gender', 'bio', 'email']) if (p[k] != null) u[k] = String(p[k]).slice(0, k === 'bio' ? 300 : 80);
+  for (const k of ['gender', 'bio']) if (p[k] != null) u[k] = String(p[k]).slice(0, k === 'bio' ? 300 : 80);
+  if (p.phone != null) {
+    const digits = String(p.phone).replace(/\D/g, '').slice(-10);
+    if (!/^[6-9]\d{9}$/.test(digits)) throw new E.HttpError(400, 'Enter a valid 10-digit Indian mobile number');
+    u.phone = '+91 ' + digits;
+  }
   if (p.photo !== undefined) {
     if (p.photo && !/^data:image\/(png|jpe?g|webp);base64,/.test(p.photo)) throw new E.HttpError(400, 'Unsupported photo');
     u.photo = p.photo || null;
@@ -149,7 +171,7 @@ app.put('/api/me/prefs', h((req) => {
   const p = req.body;
   const u = req.user;
   if (p.notif) for (const k of Object.keys(u.prefs.notif)) if (typeof p.notif[k] === 'boolean') u.prefs.notif[k] = p.notif[k];
-  for (const k of ['shareLocation', 'showPhone']) if (typeof p[k] === 'boolean') u.prefs[k] = p[k];
+  for (const k of ['shareLocation', 'allowCalls']) if (typeof p[k] === 'boolean') u.prefs[k] = p[k];
   Users.save(u);
   sync(u.id);
 }));
@@ -167,17 +189,15 @@ for (const list of ['favorites', 'blocked']) {
   }));
 }
 app.post('/api/me/vehicle', h((req) => {
-  const { vehicle: v, licence } = req.body;
+  // Vehicle details only identify the car for Ride Takers; there is no driving licence check.
+  const { vehicle: v } = req.body;
   const reg = String(v?.reg || '').toUpperCase().trim();
   if (!v?.brand || !v?.model || !v?.color || !/^[A-Z]{2}\s?\d{1,2}\s?[A-Z]{0,3}\s?\d{3,4}$/.test(reg)) throw new E.HttpError(400, 'Check the vehicle details and registration number');
-  if (!/^[A-Z0-9-]{8,20}$/i.test(String(licence || ''))) throw new E.HttpError(400, 'Enter a valid driving licence number');
   const u = req.user;
   u.vehicle = { brand: String(v.brand).slice(0, 30), model: String(v.model).slice(0, 30), color: String(v.color).slice(0, 20), reg, type: ['Hatchback', 'Sedan', 'SUV', 'EV'].includes(v.type) ? v.type : 'Sedan' };
-  u.licence = String(licence).toUpperCase();
-  u.verification = 'pending';
-  u.verificationAt = Date.now();
+  delete u.licence;
   Users.save(u);
-  E.notify(u.id, { type: 'system', title: 'Submitted for verification', body: 'Usually approved within 24 hours' });
+  sync(u.id);
 }));
 app.post('/api/me/work-verification', h((req) => E.submitWork(req.user.id, req.body)));
 app.post('/api/me/communities/:id', h((req) => {
@@ -206,13 +226,16 @@ app.get('/api/users/:id', h((req) => {
 const MIN = 60000;
 app.post('/api/search', h((req) => {
   const { origin, via = 'any', date, time, window: win } = req.body;
+  const direction = req.body.direction === 'home' ? 'home' : 'work';
   const me = req.user;
   if (!FARES[origin]) throw new E.HttpError(400, 'Choose Sangareddy or Isnapur');
   const day = date ? new Date(date).toDateString() : null;
   const out = [];
   for (const ride of Rides.where('status = \'scheduled\' AND time > ?', Date.now() - 60 * MIN)) {
     if (E.isExpired(ride) || ride.driverId === me.id || !ride.corridor) continue;
-    if (!servesOrigin(ride, origin) || (via !== 'any' && ride.corridor !== via)) continue;
+    const c = CORRIDORS[ride.corridor];
+    if (!c || c.direction !== direction) continue;
+    if (!servesOrigin(ride, origin) || (via !== 'any' && c.base !== via)) continue;
     const driver = Users.get(ride.driverId);
     if (!driver || driver.suspended || me.data.blocked.includes(ride.driverId) || driver.data?.blocked?.includes(me.id)) continue;
     if (day && new Date(ride.time).toDateString() !== day) continue;
@@ -226,7 +249,7 @@ app.post('/api/search', h((req) => {
     }
     out.push({
       ride: E.rideOut(ride, me.id), driver: E.publicUser(driver), left: E.seatsLeft(ride), fav: me.data.favorites.includes(ride.driverId),
-      pickupIdx: suggestPickup(ride, origin), fare: FARES[origin], timeDiff, outside,
+      pickupIdx: suggestPickup(ride, origin), dropIdx: suggestDrop(ride, origin), fare: FARES[origin], timeDiff, outside,
     });
   }
   return out.sort((a, b) => (b.fav - a.fav) || (a.ride.time - b.ride.time));
@@ -251,6 +274,7 @@ app.post('/api/rides/:id/demo-start', h((req) => E.demoStart(req.user.id, req.pa
 app.post('/api/rides/:id/end', h((req) => E.endRide(req.user.id, req.params.id)));
 app.post('/api/rides/:id/delay', h((req) => E.sendDelay(req.user.id, req.params.id, req.body.mins)));
 app.post('/api/rides/:id/location', h((req) => E.updateLocation(req.user.id, req.params.id, Number(req.body.lat), Number(req.body.lng))));
+app.get('/api/rides/:id/contact/:userId', h((req) => E.contactFor(req.user.id, req.params.id, idOf(req, req.params.userId))));
 app.post('/api/rides/:id/help', h((req) => E.requestHelp(req.user.id, req.params.id, req.body)));
 app.get('/api/help/:id', h((req) => {
   const r = E.helpFor(req.user.id).find((x) => x.id === req.params.id);
@@ -272,7 +296,7 @@ app.post('/api/bookings/:id/noshow', h((req) => E.markPassenger(req.user.id, req
 app.post('/api/bookings/:id/pay', h((req) => E.pay(req.user.id, req.params.id)));
 app.post('/api/reports', h((req) => E.report(req.user.id, { ...req.body, targetId: idOf(req, req.body.targetId) })));
 app.post('/api/sos', h((req) => E.sos(req.user.id, req.body.rideId)));
-app.post('/api/alerts', h((req) => E.createAlert(req.user.id, req.body.origin, req.body.via)));
+app.post('/api/alerts', h((req) => E.createAlert(req.user.id, req.body.origin, req.body.via, req.body.direction)));
 app.delete('/api/alerts/:id', h((req) => {
   const a = Alerts.get(req.params.id);
   if (a?.userId === req.user.id) Alerts.remove(a.id);
@@ -297,20 +321,18 @@ app.get('/api/admin/overview', admin, h(() => {
     counts: {
       users: users.length, active: rides.filter((r) => r.status === 'started').length, upcoming: scheduled.length,
       completed: rides.filter((r) => r.status === 'completed').length, cancelled: rides.filter((r) => r.status === 'cancelled').length,
-      openReports: Reports.count('status = \'open\''), pending: users.filter((u) => u.verification === 'pending').length + users.filter((u) => u.work?.status === 'pending').length,
+      openReports: Reports.count('status = \'open\''), pending: users.filter((u) => u.work?.status === 'pending').length,
       avgSeats: scheduled.length ? +(scheduled.reduce((a, r) => a + (r.seats - E.seatsLeft(r)), 0) / scheduled.length).toFixed(1) : 0,
     },
     week, dups,
-    queue: users.filter((u) => u.verification === 'pending').map((u) => ({ ...E.publicUser(u), vehicleFull: u.vehicle, licence: u.licence ? u.licence.slice(0, 4) + '••••' + u.licence.slice(-3) : '', at: u.verificationAt })),
     workQueue: users.filter((u) => u.work?.status === 'pending').map((u) => ({ ...E.publicUser(u), work: u.work, idImage: IdCards.where('"userId" = ?', u.id)[0]?.image || null })),
     reports: Reports.where('1=1 ORDER BY at DESC').map((r) => ({ ...r, byName: name(r.byId), targetName: name(r.targetId) })),
-    users: users.map((u) => ({ ...E.publicUser(u), phone: u.isBot ? 'demo member' : u.phone.slice(0, 6) + '•••••' + u.phone.slice(-2), isBot: u.isBot, isDriver: !!u.vehicle })),
+    users: users.map((u) => ({ ...E.publicUser(u), phone: u.isBot ? 'demo member' : maskEmail(u.email) + (u.phone ? ' · ' + u.phone.slice(0, 6) + '•••••' + u.phone.slice(-2) : ''), isBot: u.isBot, isDriver: !!u.vehicle })),
     rides: rides.sort((a, b) => b.time - a.time).slice(0, 40).map((r) => ({ id: r.id, from: r.stops[0].name, to: r.stops.at(-1).name, time: r.time, price: r.price, status: status(r), driver: name(r.driverId) })),
     audit: Audit.where('1=1 ORDER BY at DESC LIMIT 100').map((a) => ({ ...a, adminName: name(a.adminId) })),
   };
 }));
 app.post('/api/admin/work/:userId', admin, h((req) => E.adminWork(req.user.id, idOf(req, req.params.userId), !!req.body.approve)));
-app.post('/api/admin/verify/:userId', admin, h((req) => E.adminVerify(req.user.id, idOf(req, req.params.userId), !!req.body.approve)));
 app.post('/api/admin/suspend/:userId', admin, h((req) => E.adminSuspend(req.user.id, idOf(req, req.params.userId))));
 app.post('/api/admin/reports/:id', admin, h((req) => E.adminReport(req.user.id, req.params.id, req.body.outcome)));
 app.post('/api/admin/rides/:id/remove', admin, h((req) => E.adminRemoveRide(req.user.id, req.params.id)));
@@ -334,8 +356,9 @@ attachRealtime(server, userFromToken, (userId, msg) => {
 setInterval(() => { try { E.tick(); } catch (e) { console.error('[tick]', e); } }, 1000);
 setInterval(() => { try { E.housekeeping(); } catch (e) { console.error('[housekeeping]', e); } }, 15000);
 loadCorridors().then(() => {
+  E.upgradeRides();
   if (!E.DEMO) return;
   refreshDemoRides().catch((e) => console.error('[seed]', e));
   setInterval(() => refreshDemoRides().catch((e) => console.error('[seed]', e)), 30 * MIN);
 }).catch((e) => console.error('[corridors]', e));
-server.listen(PORT, () => console.log(`Saathi API on http://localhost:${PORT}  (demo bots: ${E.DEMO ? 'on' : 'off'}, SMS: ${smsConfigured ? 'Twilio' : 'console'})`));
+server.listen(PORT, () => console.log(`SRDPool API on http://localhost:${PORT}  (demo bots: ${E.DEMO ? 'on' : 'off'}, SMS: ${smsConfigured ? 'Twilio' : 'console'})`));

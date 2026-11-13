@@ -134,7 +134,7 @@ export function ManageRide({ rideId, fresh }) {
         <RouteLine ride={ride} />
         <small style={{ display: 'block', marginTop: 6 }}>{VIA[ride.corridor]}</small>
         <div className="divider" />
-        <div className="kv"><span>Fixed fares</span><b>Sangareddy ₹150{ride.corridor === 'orr' ? ' · Isnapur ₹120' : ''}</b></div>
+        <div className="kv"><span>Fixed fares</span><b>{ride.origin === 'isnapur' ? 'Isnapur ₹120' : `Sangareddy ₹150${ride.corridor?.startsWith('orr') ? ' · Isnapur ₹120' : ''}`}</b></div>
         <div className="kv"><span>Expected from confirmed</span><b style={{ color: 'var(--primary-d)' }}>{rupee(pax.filter((b) => b.status !== 'noshow').reduce((a, b) => a + b.amount, 0))}</b></div>
       </div>
 
@@ -222,7 +222,7 @@ export function ManageRide({ rideId, fresh }) {
         policy={pax.length ? `${pax.length} confirmed passenger(s) will be notified and fully refunded. Frequent cancellations lower your reliability score.` : null}
         onConfirm={(r) => cancelRide(rideId, r)} />
       <EditSheet key={ride.time + ':' + ride.seats} open={edit} onClose={() => setEdit(false)} ride={ride} minSeats={ride.seats - left} onSave={(p) => editRide(rideId, p)} />
-      <CallSheet open={!!call} onClose={() => setCall(null)} user={call} />
+      <CallSheet open={!!call} onClose={() => setCall(null)} user={call} rideId={rideId} />
     </div>
   );
 }

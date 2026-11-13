@@ -60,7 +60,7 @@ export function WorkVerify() {
     <>
       <Header title="Verify yourself" sub="Required before booking or offering rides" />
       {w.status === 'rejected' && <div className="note danger" style={{ marginBottom: 12 }}><Icon name="alert" size={18} /><span>Your last submission wasn't approved. Please check your details and upload a clearer ID card photo.</span></div>}
-      <div className="note" style={{ marginBottom: 4 }}><Icon name="shield" size={18} /><span>Saathi is only for IT professionals. Verifying your company keeps rides safe for everyone.</span></div>
+      <div className="note" style={{ marginBottom: 4 }}><Icon name="shield" size={18} /><span>SRDPool is only for IT professionals. Verifying your company keeps rides safe for everyone.</span></div>
 
       <div className="field"><label className="label" htmlFor="v-name">Name</label><input id="v-name" className="input" value={f.name} onChange={set('name')} placeholder="As on your ID card" maxLength={60} /></div>
       <div className="field"><label className="label" htmlFor="v-company">Company name</label><input id="v-company" className="input" value={f.company} onChange={set('company')} placeholder="e.g. Wipro" maxLength={60} /></div>

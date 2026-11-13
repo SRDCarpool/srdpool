@@ -56,6 +56,9 @@ const P = {
   repeat: <><path d="m17 1 4 4-4 4" /><path d="M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></>,
   ban: <><circle cx="12" cy="12" r="9.5" /><path d="m5.3 5.3 13.4 13.4" /></>,
   wifi: <><path d="M1 1l22 22M16.7 11.1A11 11 0 0 1 19 12.6M5 12.6a11 11 0 0 1 5.2-2.5M10.7 5.1A16 16 0 0 1 22.6 9M1.4 9a16 16 0 0 1 4.7-2.9M8.5 16.1a6 6 0 0 1 7 0M12 20h.01" /></>,
+  mail: <><rect x="2.5" y="4.5" width="19" height="15" rx="2.5" /><path d="m3.5 6.5 8.5 6.5 8.5-6.5" /></>,
+  wheel: <><circle cx="12" cy="12" r="9.5" /><circle cx="12" cy="12" r="2.6" /><path d="M12 14.6v6.9M9.5 11.3 2.7 9.9M14.5 11.3l6.8-1.4" /></>,
+  rider: <><circle cx="12" cy="6.5" r="3.5" /><path d="M5 21v-3.5a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5V21" /></>,
   seat: <><path d="M7 3v9a2 2 0 0 0 2 2h7l2 7M7 14l-2 7M9 9h6" /></>,
 };
 export function Icon({ name, size = 20, stroke = 2, fill = 'none', style, className }) {
@@ -162,7 +165,6 @@ export function Badges({ user, small }) {
   return (
     <>
       {user.workVerified && <span className={'badge blue' + (small ? ' sm' : '')}>🏢 {user.company || 'Work verified'}</span>}
-      {user.verified && <span className={'badge green' + (small ? ' sm' : '')}><Icon name="shield" size={12} /> Verified Ride Giver</span>}
       {user.trusted && <span className={'badge gold' + (small ? ' sm' : '')}>★ Trusted</span>}
     </>
   );
@@ -200,7 +202,7 @@ export function Segmented({ options, value, onChange }) {
   return (
     <div className="segmented" role="tablist">
       {options.map(([v, label]) => (
-        <button key={v} role="tab" aria-selected={value === v} className={value === v ? 'on' : ''} onClick={() => onChange(v)}>{label}</button>
+        <button key={v} role="tab" aria-selected={value === v} className={value === v ? 'on' : ''} onClick={() => onChange(v)}>{Array.isArray(label) ? <span className="seg-ic"><Icon name={label[0]} size={17} stroke={2.2} />{label[1]}</span> : label}</button>
       ))}
     </div>
   );
@@ -341,23 +343,24 @@ export function MapView({ ride, live, pickupIdx, dropIdx, height = 260, follow =
 }
 
 /* ---------------- ride card ---------------- */
-export const VIA = { orr: 'Via Isnapur & ORR', shankarpally: 'Via Shankarpally' };
+export const VIA = { orr: 'To office · via Isnapur & ORR', shankarpally: 'To office · via Shankarpally', orr_home: 'Going home · via ORR & Isnapur', shankarpally_home: 'Going home · via Shankarpally' };
 
 /** "9:00 AM Malkapur Chintal > SRD X Road > ORR > ICICI > Wipro Circle" */
 export function RouteLine({ ride, pickupIdx, dropIdx, withTime = true }) {
   return (
     <div className="route-line">
       {withTime && <b className="rl-time">{fmtTime(ride.time)}</b>}
-      {ride.stops.map((s, i) => (
+      {ride.stops.map((s, i) => (s.auto && i !== pickupIdx && i !== dropIdx ? null : (
         <span key={i} className={'rl-stop' + (i === pickupIdx ? ' pick' : i === dropIdx ? ' drop' : '')}>
           {i > 0 && <span className="rl-sep">›</span>}{s.name}
         </span>
-      ))}
+      )))}
     </div>
   );
 }
 
-export function RideCard({ ride, fare, pickupIdx, onClick, fav }) {
+export function RideCard({ ride, fare, pickupIdx, dropIdx, onClick, fav }) {
+  const home = ride.corridor?.endsWith('_home');
   const { state } = useStore();
   const driver = getUser(state, ride.driverId);
   const left = seatsLeft(state, ride);
@@ -373,8 +376,8 @@ export function RideCard({ ride, fare, pickupIdx, onClick, fav }) {
           <small>per seat</small>
         </div>
       </div>
-      <div style={{ margin: '10px 0 4px' }}><RouteLine ride={ride} pickupIdx={pickupIdx} withTime={false} /></div>
-      <div className="rc-tags"><span className={'mini-tag ' + (ride.corridor === 'shankarpally' ? 'amber' : 'green')}>{VIA[ride.corridor] || 'Fixed route'}</span>{pickupIdx != null && <span className="mini-tag blue">Board at {ride.stops[pickupIdx].name}</span>}</div>
+      <div style={{ margin: '10px 0 4px' }}><RouteLine ride={ride} pickupIdx={home ? undefined : pickupIdx} dropIdx={home ? dropIdx : undefined} withTime={false} /></div>
+      <div className="rc-tags"><span className={'mini-tag ' + (ride.corridor?.startsWith('shankarpally') ? 'amber' : 'green')}>{VIA[ride.corridor] || 'Fixed route'}</span>{home ? dropIdx != null && <span className="mini-tag blue">Get down at {ride.stops[dropIdx].name}</span> : pickupIdx != null && <span className="mini-tag blue">Board at {ride.stops[pickupIdx].name}</span>}</div>
       <div className="rc-foot">
         <Avatar user={driver} size={34} />
         <div className="rc-driver">

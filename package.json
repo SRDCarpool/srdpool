@@ -1,5 +1,5 @@
 {
-  "name": "saathi-carpool",
+  "name": "srdpool",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -14,6 +14,7 @@
   "dependencies": {
     "express": "^4.21.2",
     "leaflet": "^1.9.4",
+    "nodemailer": "^6.9.16",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "ws": "^8.18.0"

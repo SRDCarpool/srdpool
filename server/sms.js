@@ -18,4 +18,4 @@ export async function sendSms(phone, text) {
 }
 
 export const sendOtp = (phone, code) =>
-  sendSms(phone, `${code} is your Saathi verification code. It expires in 5 minutes. Do not share it with anyone.`);
+  sendSms(phone, `${code} is your SRDPool verification code. It expires in 5 minutes. Do not share it with anyone.`);

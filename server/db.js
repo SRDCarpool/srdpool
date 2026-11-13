@@ -8,7 +8,9 @@ import crypto from 'node:crypto';
 
 const dir = path.resolve(process.env.DATA_DIR || 'data');
 fs.mkdirSync(dir, { recursive: true });
-export const db = new DatabaseSync(process.env.DB_PATH || path.join(dir, 'saathi.db'));
+// New installs use srdpool.db; an existing saathi.db (from before the rename) keeps being used.
+const legacy = path.join(dir, 'saathi.db');
+export const db = new DatabaseSync(process.env.DB_PATH || (fs.existsSync(legacy) ? legacy : path.join(dir, 'srdpool.db')));
 db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;');
 
 export const uid = (prefix = '') => prefix + crypto.randomBytes(6).toString('base64url');
@@ -29,6 +31,12 @@ export function tx(fn) {
 function table(name, cols = []) {
   const colDefs = cols.map((c) => `"${c}"`).join(', ');
   db.exec(`CREATE TABLE IF NOT EXISTS ${name} (id TEXT PRIMARY KEY${cols.length ? ', ' + colDefs : ''}, doc TEXT NOT NULL)`);
+  // Older databases: add any new indexed column and fill it from the stored JSON.
+  const have = new Set(db.prepare(`PRAGMA table_info(${name})`).all().map((r) => r.name));
+  cols.filter((c) => !have.has(c)).forEach((c) => {
+    db.exec(`ALTER TABLE ${name} ADD COLUMN "${c}"`);
+    db.exec(`UPDATE ${name} SET "${c}" = json_extract(doc, '$.${c}')`);
+  });
   cols.forEach((c) => db.exec(`CREATE INDEX IF NOT EXISTS ${name}_${c} ON ${name}("${c}")`));
   const vals = (o) => cols.map((c) => (o[c] === undefined || o[c] === null ? null : typeof o[c] === 'boolean' ? Number(o[c]) : o[c]));
   const ins = db.prepare(`INSERT INTO ${name} (id${cols.length ? ', ' + colDefs : ''}, doc) VALUES (?${', ?'.repeat(cols.length)}, ?)`);
@@ -50,7 +58,7 @@ function table(name, cols = []) {
   };
 }
 
-export const Users = table('users', ['phone', 'isBot']);
+export const Users = table('users', ['phone', 'isBot', 'email']);
 export const Sessions = table('sessions', ['userId']);
 export const Otps = table('otps');
 export const Rides = table('rides', ['driverId', 'status', 'time']);

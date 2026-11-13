@@ -2,7 +2,8 @@ import { useStore, useAsync, getUser, myBooking, rideById } from '../store';
 import { Icon, Avatar, RideCard, RouteLine, useNav } from '../ui';
 import { useT } from '../i18n';
 import { fmtTime, fmtDay, first, rupee } from '../geo';
-import { useFares } from './find';
+import { useFares, lastDirection, saveDirection } from './find';
+import { useState } from 'react';
 import { VerifyPrompt } from './verify';
 import { HelpAlertCards } from './help';
 import { Segmented } from '../ui';
@@ -29,7 +30,10 @@ export default function Home() {
   const unpaid = myBks.find((b) => b.status === 'completed' && !b.paid && rideById(state, b.rideId));
   const pendingReq = state.bookings.filter((b) => b.status === 'requested' && myRides.some((r) => r.id === b.rideId)).length;
   const origin = lastOrigin();
-  const next = useAsync(() => (giver ? [] : search({ origin, via: 'any' })), [giver, origin]);
+  const [direction, setDir] = useState(lastDirection);
+  const homeDir = direction === 'home';
+  const setDirection = (d) => { setDir(d); saveDirection(d); };
+  const next = useAsync(() => (giver ? [] : search({ origin, via: 'any', direction })), [giver, origin, direction]);
   const pickOrigin = (o) => { try { localStorage.setItem('saathi-origin', o); } catch { /* ignore */ } nav.tab('find'); };
 
   return (
@@ -48,15 +52,15 @@ export default function Home() {
         </div>
         <div className="role-switch">
           <span>I am currently a</span>
-          <Segmented value={giver ? 'giver' : 'taker'} onChange={(r) => r !== state.me.role && setRole(r)} options={[['taker', '🙋 Ride Taker'], ['giver', '🚗 Ride Giver']]} />
+          <Segmented value={giver ? 'giver' : 'taker'} onChange={(r) => r !== state.me.role && setRole(r)} options={[['taker', ['rider', 'Ride Taker']], ['giver', ['wheel', 'Ride Giver']]]} />
         </div>
-        <h1>{giver ? 'Share your seats today' : 'Going to Financial District / HITEC City?'}</h1>
+        <h1>{giver ? 'Share your seats today' : homeDir ? 'Heading home from FD / HITEC City?' : 'Going to Financial District / HITEC City?'}</h1>
       </section>
 
       {giver ? (
         <div className="actions">
           <button className="action" onClick={() => nav.tab('post')}>
-            <span className="a-ic a-amber"><Icon name="plus" size={24} /></span>
+            <span className="a-ic a-green"><Icon name="wheel" size={24} /></span>
             <b>{t('post')}</b><small>Type your route & pickup points</small>
           </button>
           <button className="action" onClick={() => nav.tab('rides')}>
@@ -66,10 +70,13 @@ export default function Home() {
         </div>
       ) : (
         <div className="actions" style={{ gridTemplateColumns: '1fr' }}>
+          <div className="card" style={{ padding: 6 }}>
+            <Segmented value={direction} onChange={setDirection} options={[['work', '🏢 To office'], ['home', '🏠 Going home']]} />
+          </div>
           {['sangareddy', 'isnapur'].map((o) => (
             <button key={o} className="action wide" onClick={() => pickOrigin(o)}>
-              <span className="a-ic a-green"><Icon name="pin" size={22} /></span>
-              <span className="grow"><b style={{ display: 'block' }}>From {ORIGIN_NAMES[o]}</b><small>{o === 'isnapur' ? 'Via ORR' : 'Via ORR or Shankarpally'} · to FD / HITEC City</small></span>
+              <span className="a-ic a-green"><Icon name={homeDir ? 'home' : 'pin'} size={22} /></span>
+              <span className="grow"><b style={{ display: 'block' }}>{homeDir ? `Home to ${ORIGIN_NAMES[o]}` : `From ${ORIGIN_NAMES[o]}`}</b><small>{o === 'isnapur' ? 'Via ORR' : 'Via ORR or Shankarpally'} · {homeDir ? 'from FD / HITEC City' : 'to FD / HITEC City'}</small></span>
               <b style={{ fontSize: 20, color: 'var(--primary-d)' }}>{rupee(fares[o])}</b>
             </button>
           ))}
@@ -106,17 +113,17 @@ export default function Home() {
 
       {!giver && (
         <div className="section">
-          <div className="section-head"><h3>Next rides from {ORIGIN_NAMES[origin]}</h3><button className="link" onClick={() => nav.tab('find')}>See all</button></div>
+          <div className="section-head"><h3>{homeDir ? `Next rides home to ${ORIGIN_NAMES[origin]}` : `Next rides from ${ORIGIN_NAMES[origin]}`}</h3><button className="link" onClick={() => nav.tab('find')}>See all</button></div>
           {next.loading && !next.data ? (
             <div className="card center"><span className="spinner" style={{ display: 'inline-block' }} /></div>
           ) : next.data?.length ? (
             <div className="stack">
               {next.data.filter((r) => !r.outside).slice(0, 3).map((r) => (
-                <RideCard key={r.ride.id} ride={r.ride} fare={r.fare} pickupIdx={r.pickupIdx} fav={r.fav} onClick={() => nav.go('ride', { rideId: r.ride.id, origin, pickupIdx: r.pickupIdx })} />
+                <RideCard key={r.ride.id} ride={r.ride} fare={r.fare} pickupIdx={r.pickupIdx} dropIdx={r.dropIdx} fav={r.fav} onClick={() => nav.go('ride', { rideId: r.ride.id, origin, pickupIdx: r.pickupIdx, dropIdx: r.dropIdx })} />
               ))}
             </div>
           ) : (
-            <div className="card"><p className="muted">No upcoming rides from {ORIGIN_NAMES[origin]} right now. Open Find Ride to turn on an alert.</p></div>
+            <div className="card"><p className="muted">No upcoming rides {homeDir ? 'home to' : 'from'} {ORIGIN_NAMES[origin]} right now. Open Find Ride to turn on an alert.</p></div>
           )}
         </div>
       )}

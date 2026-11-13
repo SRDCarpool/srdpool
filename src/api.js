@@ -1,4 +1,4 @@
-// HTTP + WebSocket client for the Saathi API.
+// HTTP + WebSocket client for the SRDPool API.
 const TOKEN_KEY = 'saathi-token';
 let token = (() => { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } })();
 
@@ -10,7 +10,7 @@ export function setToken(t) {
 
 export class ApiError extends Error {
   constructor(status, body) {
-    super(body?.error || (status === 0 ? "Can't reach Saathi. Check your internet connection." : 'Something went wrong'));
+    super(body?.error || (status === 0 ? "Can't reach SRDPool. Check your internet connection." : 'Something went wrong'));
     this.status = status;
     this.body = body;
   }
