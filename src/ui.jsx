@@ -176,6 +176,7 @@ const STAGES = [
   ['completed', 'Completed'],
 ];
 export function StatusSteps({ booking, ride }) {
+  if (booking.status === 'transferred') return <div className="note"><Icon name="car" size={16} /><span>Moved to another driver's ride after a breakdown.</span></div>;
   if (['cancelled', 'rejected', 'noshow', 'expired'].includes(booking.status)) {
     const label = { rejected: 'Request not accepted', noshow: 'Marked as no-show', expired: 'Ride expired', cancelled: 'Cancelled' }[booking.status];
     return <div className="status-cancel"><Icon name="x" size={16} /> {label}{booking.reason ? ` · ${booking.reason}` : ''}</div>;
@@ -276,13 +277,16 @@ export function RouteStops({ ride, pickupIdx, dropIdx, compact }) {
 const dotIcon = (cls) => L.divIcon({ className: '', html: `<div class="mk ${cls}"></div>`, iconSize: [18, 18], iconAnchor: [9, 9] });
 const carIcon = L.divIcon({ className: '', html: '<div class="mk-car"><div class="mk-pulse"></div>🚗</div>', iconSize: [36, 36], iconAnchor: [18, 18] });
 
-export function MapView({ ride, live, pickupIdx, dropIdx, height = 260, follow = false, showLabels = true }) {
+const sosIcon = L.divIcon({ className: '', html: '<div class="mk-sos">🆘</div>', iconSize: [34, 34], iconAnchor: [17, 17] });
+
+export function MapView({ ride, live, pickupIdx, dropIdx, height = 260, follow = false, showLabels = true, alert }) {
   const { state } = useStore();
   const el = useRef(null);
   const map = useRef(null);
   const layers = useRef(null);
   const car = useRef(null);
   const userMoved = useRef(false);
+  const alertMk = useRef(null);
   const stops = ride?.stops || [];
   const geometry = ride?.geometry?.length ? ride.geometry : stops.map((s) => [s.lat, s.lng]);
   const key = (ride?.id || '') + ':' + geometry.length + ':' + stops.length + ':' + pickupIdx + ':' + dropIdx;
@@ -325,6 +329,13 @@ export function MapView({ ride, live, pickupIdx, dropIdx, height = 260, follow =
     else car.current.setLatLng(ll);
     if (follow && !userMoved.current) m.panTo(ll, { animate: true });
   }, [live?.lat, live?.lng, follow]); // eslint-disable-line
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    alertMk.current?.remove();
+    alertMk.current = alert ? L.marker([alert.lat, alert.lng], { icon: sosIcon, zIndexOffset: 900 }).addTo(m) : null;
+  }, [alert?.lat, alert?.lng]); // eslint-disable-line
 
   return <div className="map" style={{ height }} ref={el} role="region" aria-label="Route map" />;
 }

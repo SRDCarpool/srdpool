@@ -11,11 +11,12 @@ import { Track, Chat, RideDone } from './screens/track';
 import { Profile, ProfilePage } from './screens/profile';
 import Notifications from './screens/notifications';
 import Admin from './screens/admin';
+import { HelpScreen } from './screens/help';
 
 const SCREENS = {
   home: Home, find: FindRide, post: PostRide, rides: MyRides, profile: Profile,
   ride: RideDetail, driver: DriverProfile, manage: ManageRide, track: Track, chat: Chat, done: RideDone,
-  page: ProfilePage, notifications: Notifications, admin: Admin,
+  page: ProfilePage, notifications: Notifications, admin: Admin, help: HelpScreen,
 };
 const TAKER_TABS = [['home', 'home', 'home'], ['find', 'search', 'find'], ['rides', 'calendar', 'myRides'], ['profile', 'user', 'profile']];
 const GIVER_TABS = [['home', 'home', 'home'], ['post', 'plus', 'post'], ['rides', 'calendar', 'myRides'], ['profile', 'user', 'profile']];
@@ -45,9 +46,9 @@ function Toast({ onOpen }) {
   const { state } = useStore();
   const t = state.toast;
   if (!t) return null;
-  const icon = { track: 'car', chat: 'chat', match: 'bell', done: 'check', reminder: 'clock', booking: 'calendar', fav: 'heart' }[t.kind] || 'bell';
+  const icon = { track: 'car', chat: 'chat', match: 'bell', done: 'check', reminder: 'clock', booking: 'calendar', fav: 'heart', help: 'alert' }[t.kind] || 'bell';
   return (
-    <button className="toast" key={t.id} onClick={() => t.rideId && onOpen(t.rideId)} role="status">
+    <button className={'toast' + (t.kind === 'help' ? ' toast-help' : '')} key={t.id} onClick={() => (t.helpId ? onOpen(null, t.helpId) : t.rideId && onOpen(t.rideId))} role="status">
       <span className="t-ic"><Icon name={icon} size={18} /></span>
       <span><b>{t.title}</b>{t.body && <small>{t.body}</small>}</span>
     </button>
@@ -114,7 +115,7 @@ export default function App() {
 
   const Screen = SCREENS[cur.name] || Home;
   const isTab = stack.length === 1 && TABS.some(([n]) => n === cur.name);
-  const openRide = (rideId) => nav.go(...rideRoute(state, rideId));
+  const openRide = (rideId, helpId) => (helpId ? nav.go('help', { helpId }) : nav.go(...rideRoute(state, rideId)));
 
   return (
     <NavCtx.Provider value={{ ...nav, openRide, depth: stack.length }}>

@@ -1,7 +1,7 @@
 // Builds the per-user snapshot the app renders from. The caller's own id is
 // replaced with "me" so the client can stay identity-agnostic.
 import { Users, Rides, Bookings, Messages, Notifications, Payments, Reports, Alerts } from './db.js';
-import { publicUser, rideOut } from './engine.js';
+import { publicUser, rideOut, helpFor } from './engine.js';
 
 export function meify(value, userId) {
   if (value === userId) return 'me';
@@ -52,6 +52,6 @@ export function buildState(userId, { admin = false } = {}) {
     me: privateMe(u), users, rides: out, bookings, notifications, chats,
     payments: Payments.where('"userId" = ? ORDER BY rowid DESC', userId),
     reports, alerts: Alerts.where('"userId" = ?', userId),
-    ...u.data, prefs: u.prefs, admin,
+    help: helpFor(userId), ...u.data, prefs: u.prefs, admin,
   }, userId);
 }

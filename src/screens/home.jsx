@@ -4,6 +4,7 @@ import { useT } from '../i18n';
 import { fmtTime, fmtDay, first, rupee } from '../geo';
 import { useFares } from './find';
 import { VerifyPrompt } from './verify';
+import { HelpAlertCards } from './help';
 import { Segmented } from '../ui';
 
 const ORIGIN_NAMES = { sangareddy: 'Sangareddy', isnapur: 'Isnapur' };
@@ -76,6 +77,7 @@ export default function Home() {
       )}
 
       <VerifyPrompt />
+      <HelpAlertCards />
 
       {live && (
         <button className="card live-card" style={{ marginTop: 16, textAlign: 'left' }} onClick={() => nav.go('track', { rideId: live.id })}>

@@ -73,7 +73,7 @@ export function StoreProvider({ children }) {
         clearTimeout(t);
         t = setTimeout(() => { refresh(); setVersion((v) => v + 1); }, 80);
       } else if (msg.type === 'notification') {
-        if (msg.toast) setToastState({ id: tid(), title: msg.n.title, body: msg.n.body, rideId: msg.n.rideId, kind: msg.n.type });
+        if (msg.toast) setToastState({ id: tid(), title: msg.n.title, body: msg.n.body, rideId: msg.n.rideId, helpId: msg.n.helpId, kind: msg.n.type });
       } else if (msg.type === 'live') {
         const patch = (r) => (r && r.id === msg.rideId ? { ...r, live: msg.live, status: msg.status } : r);
         setSnap((s) => (s ? { ...s, rides: s.rides.map(patch) } : s));
@@ -230,6 +230,14 @@ export function StoreProvider({ children }) {
       markNoShow: (id) => run(() => post(`/bookings/${id}/noshow`), 'Marked as no-show'),
       sendDelay: (id, mins) => run(() => post(`/rides/${id}/delay`, { mins })),
       endRide: (id) => run(() => post(`/rides/${id}/end`)),
+      requestHelp: async (rideId, body) => {
+        try { const r = await post(`/rides/${rideId}/help`, body); refresh(); return { ok: true, req: r }; } catch (e) { showToast(e.message); return { ok: false }; }
+      },
+      offerHelp: async (helpId, rideId) => {
+        try { const r = await post(`/help/${helpId}/offer`, { rideId }); refresh(); return { ok: true, ...r }; } catch (e) { showToast(e.message); refresh(); return { ok: false }; }
+      },
+      declineHelp: (helpId) => run(() => post(`/help/${helpId}/decline`)),
+      cancelHelp: (helpId) => run(() => post(`/help/${helpId}/cancel`), 'Glad it is fixed — continuing the ride'),
 
       /* chat, ratings, safety */
       sendChat: (rideId, text) => run(() => post(`/rides/${rideId}/messages`, { text })),
@@ -258,6 +266,7 @@ export function StoreProvider({ children }) {
     subscriptions: snap?.subscriptions || [],
     payments: snap?.payments || [],
     alerts: snap?.alerts || [],
+    help: snap?.help || [],
     reports: snap?.reports || [],
     me: snap?.me || {},
     prefs: snap?.prefs || { notif: {} },

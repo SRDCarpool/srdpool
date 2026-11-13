@@ -65,3 +65,4 @@ export const Audit = table('audit', ['at']);
 export const GeoCache = table('geocache');
 // ID card images live apart from user records and are deleted once reviewed.
 export const IdCards = table('idcards', ['userId']);
+export const HelpRequests = table('help_requests', ['rideId', 'status', 'at']);

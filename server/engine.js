@@ -1,6 +1,6 @@
 // Core business logic. Every mutation persists to SQLite, writes notifications,
 // and pushes realtime updates to the affected users.
-import { Users, Rides, Bookings, Messages, Notifications, Reports, Payments, Alerts, Audit, IdCards, uid } from './db.js';
+import { Users, Rides, Bookings, Messages, Notifications, Reports, Payments, Alerts, Audit, IdCards, HelpRequests, uid } from './db.js';
 import { send, sync } from './realtime.js';
 import { project, pointAt, etaMin } from './geo.js';
 import { CORRIDORS, ORIGINS, FARES, placeStops, servesOrigin, suggestPickup, rideShape, geomOf } from './corridors.js';
@@ -88,7 +88,7 @@ const getBooking = (id) => Bookings.get(id) || (() => { throw notFound('Booking 
 const members = (ride, statuses = ['confirmed', 'picked']) => Bookings.where('"rideId" = ?', ride.id).filter((b) => statuses.includes(b.status));
 
 /* ---------------- notifications ---------------- */
-const CAT = { booking: 'bookings', track: 'bookings', done: 'bookings', chat: 'chat', match: 'matches', reminder: 'reminders', fav: 'favorites', system: 'bookings' };
+const CAT = { booking: 'bookings', track: 'bookings', done: 'bookings', chat: 'chat', match: 'matches', reminder: 'reminders', fav: 'favorites', system: 'bookings', help: 'bookings' };
 export function notify(userId, n) {
   const u = Users.get(userId);
   if (!u || u.isBot) return;
@@ -589,7 +589,7 @@ function botRequest(rideId, botId, pickupIdx, dropIdx, origin = 'sangareddy') {
 /* ---------------- background jobs ---------------- */
 export function tick() {
   for (const ride of Rides.where('status = \'started\'')) {
-    if (ride.simulate) processRide(ride, ride.posKm + SIM_SPEED, true);
+    if (ride.simulate && !ride.breakdown) processRide(ride, ride.posKm + SIM_SPEED, true);
   }
 }
 
@@ -614,6 +614,197 @@ export function housekeeping() {
       if (!u.data.holidayMode) notify(b.passengerId, { type: 'reminder', title: `Ride with ${first(driver.name)} in ${mins} min`, body: `Be at ${ride.stops[b.pickupIdx].name} by ${fmtTime(ride.time)}`, rideId: ride.id });
     });
   }
+}
+
+/* ---------------- breakdown help: move passengers to nearby rides ---------------- */
+export const HELP_REASONS = ['Flat tyre', 'Engine trouble', 'Accident', 'Out of fuel', 'Other'];
+
+function nearestStopName(ride, pos) {
+  let best = ride.stops[0];
+  for (const s of ride.stops) if (Math.abs(s.pos - pos) < Math.abs(best.pos - pos)) best = s;
+  return best.name;
+}
+
+/** Rides that will pass the breakdown spot soon, haven't passed it yet, and have empty seats. */
+function findHelpers(ride, spot) {
+  const now = Date.now();
+  const owner = Users.get(ride.driverId);
+  return Rides.where('status IN (\'started\', \'scheduled\')').filter((r) => {
+    if (r.id === ride.id || !r.corridor || seatsLeft(r) < 1) return false;
+    if (r.status === 'scheduled' && (isExpired(r) || r.time - now > 75 * MIN)) return false;
+    if (r.breakdown) return false;
+    const d = Users.get(r.driverId);
+    if (!d || d.suspended || d.data?.blocked?.includes(owner.id) || owner.data.blocked.includes(d.id)) return false;
+    const p = project(spot, geomOf(r));
+    if (p.dist > 2.5) return false;
+    const cur = r.status === 'started' ? (r.live?.posKm ?? r.posKm) : (r.startKm || 0);
+    return cur <= p.pos + 0.3 && r.stops.at(-1).pos > p.pos + 1;
+  });
+}
+
+const waitingBookings = (req) => req.bookingIds.map((id) => Bookings.get(id)).filter((b) => b && b.rideId === req.rideId && ['confirmed', 'picked'].includes(b.status));
+
+export function requestHelp(userId, rideId, { reason, note } = {}) {
+  const ride = ownRide(userId, rideId);
+  if (ride.status !== 'started') throw bad('You can ask for help during a live ride');
+  if (HelpRequests.where('"rideId" = ? AND status = \'open\'', rideId).length) throw bad('A help request is already open for this ride');
+  const driver = Users.get(userId);
+  const pax = members(ride);
+  const loc = ride.live?.lat ? ride.live : pointAt(geomOf(ride), ride.posKm);
+  const req = {
+    id: uid('h_'), rideId, driverId: userId, reason: HELP_REASONS.includes(reason) ? reason : 'Other', note: String(note || '').slice(0, 200),
+    lat: +loc.lat.toFixed(5), lng: +loc.lng.toFixed(5), pos: ride.posKm, placeName: nearestStopName(ride, ride.posKm),
+    status: 'open', at: Date.now(), bookingIds: pax.map((b) => b.id), placed: [], offers: [], declined: [],
+  };
+  const helpers = pax.length ? findHelpers(ride, req) : [];
+  req.candidates = helpers.map((r) => r.id);
+  HelpRequests.insert(req);
+  ride.breakdown = { reason: req.reason, at: req.at, helpId: req.id };
+  saveRide(ride);
+  chat(ride.id, userId, `⚠️ ${req.reason}. I've asked other Saathi drivers nearby to take you to your destination. Please stay safe.`, true);
+  pax.forEach((b) => notify(b.passengerId, { type: 'track', title: `${first(driver.name)}'s car has a problem: ${req.reason}`, body: "We're finding you a seat in another Saathi ride nearby.", rideId }));
+  const seats = pax.reduce((a, b) => a + b.seats, 0);
+  helpers.forEach((r, i) => {
+    notify(r.driverId, { type: 'help', title: `🆘 ${first(driver.name)} needs help near ${req.placeName}`, body: `${req.reason} · ${seats} passenger seat${seats !== 1 ? 's' : ''} needed. You have ${seatsLeft(r)} empty.`, helpId: req.id, rideId: r.id });
+    if (DEMO && isBot(r.driverId)) later(40000 + i * 5000, () => { try { offerHelp(r.driverId, req.id, r.id); } catch { /* already handled */ } });
+  });
+  notify(userId, !pax.length
+    ? { type: 'system', title: 'Breakdown reported', body: 'No passengers on board need a seat.', rideId }
+    : helpers.length
+      ? { type: 'system', title: `Help request sent to ${helpers.length} nearby driver${helpers.length > 1 ? 's' : ''}`, body: `${seats} seat${seats > 1 ? 's' : ''} needed near ${req.placeName}`, rideId }
+      : { type: 'system', title: 'No nearby rides with empty seats right now', body: "We'll keep your request open. Use SOS if anyone is unsafe.", rideId });
+  touchRide(ride);
+  sync(helpers.map((r) => r.driverId));
+  return helpOut(req, userId);
+}
+
+/** Insert a stop into a ride by position, shifting booking indices after it. */
+function insertStop(r, stop) {
+  let i = r.stops.findIndex((s) => s.pos > stop.pos);
+  if (i < 1) i = i === 0 ? 1 : r.stops.length - 1;
+  // Keep positions in travel order even if the spot is a little behind the helper's start.
+  stop.pos = Math.min(Math.max(stop.pos, r.stops[i - 1].pos), r.stops[i].pos);
+  r.stops.splice(i, 0, stop);
+  for (const b of Bookings.where('"rideId" = ?', r.id)) {
+    let changed = false;
+    if (b.pickupIdx >= i) { b.pickupIdx++; changed = true; }
+    if (b.dropIdx >= i) { b.dropIdx++; changed = true; }
+    if (changed) Bookings.save(b);
+  }
+  return i;
+}
+
+const nearestIdx = (r, pos, from, to) => {
+  let best = from, bd = Infinity;
+  for (let i = from; i <= to; i++) { const d = Math.abs(r.stops[i].pos - pos); if (d < bd) { bd = d; best = i; } }
+  return best;
+};
+
+export function offerHelp(helperId, helpId, rideId) {
+  const req = HelpRequests.get(helpId);
+  if (!req) throw notFound('Help request not found');
+  if (req.status !== 'open') throw bad('This request has already been handled — thank you!');
+  const r = getRide(rideId);
+  if (r.driverId !== helperId) throw forbidden();
+  if (!req.candidates.includes(rideId)) throw bad("Your ride doesn't pass this spot");
+  const ride = getRide(req.rideId);
+  const owner = Users.get(req.driverId), helper = Users.get(helperId);
+  let free = seatsLeft(r);
+  const moving = [];
+  const alreadyAboard = (pid) => Bookings.where('"rideId" = ? AND "passengerId" = ?', r.id, pid).some((x) => ACTIVE.includes(x.status));
+  for (const b of waitingBookings(req)) if (b.seats <= free && !alreadyAboard(b.passengerId)) { moving.push(b); free -= b.seats; }
+  if (!moving.length) throw bad(free ? 'These passengers have already been placed' : 'No empty seats left in your car');
+
+  const spot = project({ lat: req.lat, lng: req.lng }, geomOf(r));
+  let rescueIdx = null;
+  const g = geomOf(r);
+  for (const b of moving) {
+    const waitingAhead = b.status === 'confirmed' && ride.stops[b.pickupIdx].pos > req.pos + 0.05;
+    let pickupIdx;
+    if (waitingAhead) {
+      const pp = project(ride.stops[b.pickupIdx], g, undefined, spot.pos).pos;
+      pickupIdx = r.stops.length > 2 ? nearestIdx(r, pp, 1, r.stops.length - 2) : null;
+      if (pickupIdx != null && r.stops[pickupIdx].pos < spot.pos - 0.05) pickupIdx = null;
+    }
+    if (pickupIdx == null) {
+      if (rescueIdx == null) rescueIdx = insertStop(r, { name: `🆘 Pickup at ${owner.name.split(' ')[0]}'s car (${req.placeName})`, area: '', lat: req.lat, lng: req.lng, pos: +spot.pos.toFixed(3), rescue: true });
+      pickupIdx = rescueIdx;
+    }
+    const dp = project(ride.stops[b.dropIdx], g, undefined, r.stops[pickupIdx].pos).pos;
+    const dropIdx = nearestIdx(r, dp, pickupIdx + 1, r.stops.length - 1);
+    const nb = Bookings.insert({
+      id: uid('b_'), rideId: r.id, passengerId: b.passengerId, seats: b.seats, pickupIdx, dropIdx, origin: b.origin, status: 'confirmed',
+      amount: b.amount, paid: false, createdAt: Date.now(), confirmedAt: Date.now(), rescue: true, fromRideId: ride.id, note: 'Moved after a breakdown',
+    });
+    b.status = 'transferred';
+    b.transferredTo = { bookingId: nb.id, rideId: r.id };
+    b.reason = `${req.reason} — moved to ${first(helper.name)}'s ride`;
+    if (b.paid) refund(b, 1);
+    Bookings.save(b);
+    req.placed.push(b.id);
+    notify(b.passengerId, { type: 'booking', title: `You're moved to ${first(helper.name)}'s ride 🚗`, body: `${r.vehicle.color} ${r.vehicle.brand} ${r.vehicle.model} · ${r.vehicle.reg} picks you up at ${r.stops[pickupIdx].name}`, rideId: r.id });
+    chat(r.id, b.passengerId, `Thank you for picking me up! I'm with ${first(owner.name)}'s car near ${req.placeName}.`, true);
+  }
+  saveRide(r);
+  req.offers.push({ rideId, driverId: helperId, seats: moving.reduce((a, b) => a + b.seats, 0), at: Date.now() });
+  const left = waitingBookings(req);
+  if (!left.length) req.status = 'resolved';
+  HelpRequests.save(req);
+  notify(req.driverId, {
+    type: 'system',
+    title: `${first(helper.name)} is taking ${moving.length} passenger${moving.length > 1 ? 's' : ''} 🙏`,
+    body: left.length ? `${left.length} still waiting for a seat` : 'Everyone has a seat. You can end your ride when ready.',
+    rideId: ride.id,
+  });
+  notify(helperId, { type: 'system', title: 'Thank you for helping! 🙏', body: `${moving.length} passenger${moving.length > 1 ? 's' : ''} added to your ride — pickup at ${req.placeName}`, rideId: r.id });
+  touchRide(ride);
+  touchRide(r);
+  return { moved: moving.length, remaining: left.length };
+}
+
+export function declineHelp(userId, helpId) {
+  const req = HelpRequests.get(helpId);
+  if (!req) throw notFound();
+  if (!req.declined.includes(userId)) req.declined.push(userId);
+  HelpRequests.save(req);
+  sync(userId);
+}
+
+/** The driver fixed the problem: close the request and carry on. */
+export function cancelHelp(userId, helpId) {
+  const req = HelpRequests.get(helpId);
+  if (!req || req.driverId !== userId) throw forbidden();
+  if (req.status === 'open') req.status = 'cancelled';
+  HelpRequests.save(req);
+  const ride = getRide(req.rideId);
+  ride.breakdown = null;
+  saveRide(ride);
+  members(ride).forEach((b) => notify(b.passengerId, { type: 'track', title: 'The problem is fixed — continuing the ride', rideId: ride.id }));
+  chat(ride.id, userId, '✅ Problem fixed. Continuing the ride.', true);
+  touchRide(ride);
+  Rides.where('status IN (\'started\', \'scheduled\')').filter((r) => req.candidates.includes(r.id)).forEach((r) => sync(r.driverId));
+}
+
+export function helpOut(req, viewerId) {
+  const owner = Users.get(req.driverId);
+  const ride = Rides.get(req.rideId);
+  const waiting = waitingBookings(req);
+  const myRide = Rides.where('"driverId" = ? AND status IN (\'started\', \'scheduled\')', viewerId).find((r) => req.candidates.includes(r.id));
+  return {
+    ...req, driver: publicUser(owner), vehicle: ride?.vehicle ? { ...ride.vehicle } : null,
+    offers: req.offers.map((o) => ({ ...o, driverName: Users.get(o.driverId)?.name })),
+    destination: ride?.stops.at(-1).name, seatsNeeded: waiting.reduce((a, b) => a + b.seats, 0), passengersWaiting: waiting.length,
+    myRideId: myRide?.id || null, mySeatsLeft: myRide ? seatsLeft(myRide) : 0, declinedByMe: req.declined.includes(viewerId),
+  };
+}
+
+/** Help requests relevant to a user (as the driver asking, a candidate helper, or a passenger). */
+export function helpFor(userId) {
+  const myRideIds = new Set(Rides.where('"driverId" = ?', userId).map((r) => r.id));
+  const myBookingIds = new Set(Bookings.where('"passengerId" = ?', userId).map((b) => b.id));
+  return HelpRequests.where('at > ?', Date.now() - 12 * 3600e3)
+    .filter((h) => h.driverId === userId || h.candidates.some((id) => myRideIds.has(id)) || h.bookingIds.some((id) => myBookingIds.has(id)))
+    .map((h) => helpOut(h, userId));
 }
 
 /* ---------------- work verification ---------------- */

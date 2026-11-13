@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { Header, Icon, Empty, useNav } from '../ui';
 import { timeAgo } from '../geo';
 
-const IC = { track: ['car', 'green'], chat: ['chat', 'blue'], match: ['bell', 'amber'], done: ['check', 'green'], reminder: ['clock', 'amber'], booking: ['calendar', 'blue'], system: ['info', ''], fav: ['heart', 'red'] };
+const IC = { track: ['car', 'green'], chat: ['chat', 'blue'], match: ['bell', 'amber'], done: ['check', 'green'], reminder: ['clock', 'amber'], booking: ['calendar', 'blue'], system: ['info', ''], fav: ['heart', 'red'], help: ['alert', 'red'] };
 
 export default function Notifications() {
   const { state, markAllRead } = useStore();
@@ -16,7 +16,7 @@ export default function Notifications() {
       {list.length ? list.map((n) => {
         const [ic, tone] = IC[n.type] || IC.system;
         return (
-          <button key={n.id} className={'notif' + (n.read ? '' : ' unread')} onClick={() => n.rideId && nav.openRide(n.rideId)}>
+          <button key={n.id} className={'notif' + (n.read ? '' : ' unread')} onClick={() => (n.helpId ? nav.go('help', { helpId: n.helpId }) : n.rideId && nav.openRide(n.rideId))}>
             <span className={'row-ic ' + tone}><Icon name={ic} size={18} /></span>
             <span className="grow">
               <b style={{ fontSize: 14.5, display: 'block' }}>{n.title}</b>

@@ -251,6 +251,15 @@ app.post('/api/rides/:id/demo-start', h((req) => E.demoStart(req.user.id, req.pa
 app.post('/api/rides/:id/end', h((req) => E.endRide(req.user.id, req.params.id)));
 app.post('/api/rides/:id/delay', h((req) => E.sendDelay(req.user.id, req.params.id, req.body.mins)));
 app.post('/api/rides/:id/location', h((req) => E.updateLocation(req.user.id, req.params.id, Number(req.body.lat), Number(req.body.lng))));
+app.post('/api/rides/:id/help', h((req) => E.requestHelp(req.user.id, req.params.id, req.body)));
+app.get('/api/help/:id', h((req) => {
+  const r = E.helpFor(req.user.id).find((x) => x.id === req.params.id);
+  if (!r) throw new E.HttpError(404, 'Help request not found');
+  return r;
+}));
+app.post('/api/help/:id/offer', h((req) => E.offerHelp(req.user.id, req.params.id, req.body.rideId)));
+app.post('/api/help/:id/decline', h((req) => E.declineHelp(req.user.id, req.params.id)));
+app.post('/api/help/:id/cancel', h((req) => E.cancelHelp(req.user.id, req.params.id)));
 app.post('/api/rides/:id/book', h((req) => E.book(req.user.id, req.params.id, req.body)));
 app.post('/api/rides/:id/waitlist', h((req) => E.waitlist(req.user.id, req.params.id, !!req.body.join, req.body)));
 app.post('/api/rides/:id/subscribe', h((req) => E.subscribe(req.user.id, req.params.id)));

@@ -214,7 +214,12 @@ export function RideDetail({ rideId, origin: originParam, pickupIdx: pIdx }) {
           {activeB?.status === 'requested' && <div className="note" style={{ marginTop: 12 }}><Icon name="clock" size={18} /> Request sent. {first(driver.name)} usually responds within a few minutes.</div>}
         </div>
       )}
-      {b && ['cancelled', 'rejected', 'noshow', 'expired'].includes(b.status) && <div className="card" style={{ marginTop: 12 }}><StatusSteps booking={b} ride={ride} /></div>}
+      {b && ['cancelled', 'rejected', 'noshow', 'expired', 'transferred'].includes(b.status) && (
+        <div className="card" style={{ marginTop: 12 }}>
+          <StatusSteps booking={b} ride={ride} />
+          {b.transferredTo && <button className="btn block" style={{ marginTop: 10 }} onClick={() => nav.replace('ride', { rideId: b.transferredTo.rideId })}><Icon name="car" /> Open your new ride</button>}
+        </div>
+      )}
       {['cancelled', 'expired'].includes(ride.status) && !b && <div className="note danger" style={{ marginTop: 12 }}><Icon name="x" size={18} /> This ride is no longer available.</div>}
 
       <div className="card" style={{ marginTop: 12 }}>

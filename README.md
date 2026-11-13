@@ -12,6 +12,17 @@ There is no rating system. Trust comes from OTP-verified phones, member verifica
 
 The top of **Home** has an *I am currently a [Ride Taker] [Ride Giver]* switch.
 
+### Breakdown help (moving passengers to other rides)
+
+If a car has a problem during a live ride (flat tyre, engine trouble, accident, out of fuel…), the driver taps **Car trouble? Ask nearby drivers for help** on the live ride screen.
+
+1. The car is marked as stopped and passengers are told a seat is being found for them.
+2. Saathi alerts Ride Givers whose rides **pass the breakdown spot, haven't passed it yet, are live or leave within 75 minutes, and have empty seats**. They see a red 🆘 card on Home and an alert with the spot on a map.
+3. A helper taps **Offer seats**. Passengers are moved to the helper's ride automatically: a 🆘 pickup stop is added at the broken-down car, and each passenger is dropped at the helper's stop closest to where they were going. They pay the helper the same fare, and any earlier payment is refunded.
+4. Passengers get the new car's colour, model and number plate. The first driver sees who helped, and can end the ride, or tap **Problem fixed — continue ride** if the car is repaired.
+
+In demo mode, demo drivers offer help after about 40 seconds, so real drivers get the first chance.
+
 ### Member verification
 
 Before booking or posting a ride, every member submits: **name, company name, place of work, designation, Ride Giver / Ride Taker / both, and an ID card picture**. An admin reviews it in *Admin dashboard → Verify*. The ID card image is stored separately from the member's record, is visible only to admins, and is **deleted the moment it is approved or rejected** (the audit log records the deletion). Verified members show a 🏢 company badge. Members can book and post while their verification is under review.

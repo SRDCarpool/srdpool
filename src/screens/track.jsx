@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useStore, getUser, myBooking, rideById } from '../store';
 import { Header, Icon, Avatar, MapView, SlideToConfirm, Chip, Empty, useNav } from '../ui';
 import { CallSheet, ReportSheet, useRide } from './find';
+import { HelpPanel, PassengerHelpBanner } from './help';
 import { fmtTime, first, rupee, etaMin, km } from '../geo';
 import { useT } from '../i18n';
 
@@ -46,7 +47,9 @@ export function Track({ rideId }) {
         <div style={{ height: '100%', width: pct + '%', background: 'var(--primary)', transition: 'width 1s linear' }} />
       </div>
 
-      {mine ? <DriverPanel ride={ride} pos={pos} onCall={setCall} /> : b && <PassengerPanel ride={ride} b={b} pos={pos} driver={driver} onCall={() => setCall(driver)} onBoard={() => confirmBoarded(b.id)} />}
+      {!mine && <PassengerHelpBanner ride={ride} booking={b} />}
+      {mine ? <DriverPanel ride={ride} pos={pos} onCall={setCall} /> : b && b.status !== 'transferred' && <PassengerPanel ride={ride} b={b} pos={pos} driver={driver} onCall={() => setCall(driver)} onBoard={() => confirmBoarded(b.id)} />}
+      {mine && ride.status === 'started' && <HelpPanel ride={ride} />}
 
       {ride.status === 'started' && (
         <>

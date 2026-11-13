@@ -8,7 +8,7 @@ import { useT } from '../i18n';
 const STATUS_BADGE = {
   requested: ['gray', 'Requested'], confirmed: ['green', 'Confirmed'], picked: ['blue', 'On board'],
   completed: ['green', 'Completed'], cancelled: ['red', 'Cancelled'], rejected: ['red', 'Not accepted'],
-  noshow: ['red', 'No-show'], scheduled: ['gold', 'Scheduled'], started: ['blue', 'In progress'], expired: ['gray', 'Expired'], waitlist: ['gray', 'Waiting list'],
+  noshow: ['red', 'No-show'], scheduled: ['gold', 'Scheduled'], started: ['blue', 'In progress'], expired: ['gray', 'Expired'], waitlist: ['gray', 'Waiting list'], transferred: ['blue', 'Moved to another car'],
 };
 
 export function MyRides() {
@@ -25,7 +25,7 @@ export function MyRides() {
     const r = rideById(state, b.rideId);
     if (!r) continue;
     const st = b.status;
-    const bucket = ['requested', 'confirmed', 'picked', 'waitlist'].includes(st) ? 'upcoming' : ['cancelled', 'rejected'].includes(st) ? 'cancelled' : 'completed';
+    const bucket = ['requested', 'confirmed', 'picked', 'waitlist'].includes(st) ? 'upcoming' : ['cancelled', 'rejected', 'transferred'].includes(st) ? 'cancelled' : 'completed';
     items.push({ id: b.id, ride: r, booking: b, mine: false, status: st, bucket });
   }
   const list = items.filter((i) => i.bucket === tab).sort((a, b) => (tab === 'upcoming' ? a.ride.time - b.ride.time : b.ride.time - a.ride.time));
