@@ -5,7 +5,9 @@
 //  3. Neither → development: emails print to the server console.
 import nodemailer from 'nodemailer';
 
-const { BREVO_API_KEY, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM } = process.env;
+const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM } = process.env;
+// Strip spaces/quotes that sneak in when pasting the key into a dashboard.
+const BREVO_API_KEY = String(process.env.BREVO_API_KEY || '').trim().replace(/^["']|["']$/g, '').trim();
 const useBrevoApi = !!BREVO_API_KEY;
 const useSmtp = !useBrevoApi && !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
 export const mailConfigured = useBrevoApi || useSmtp;
@@ -58,7 +60,14 @@ export async function checkMail() {
   if (useBrevoApi) {
     try {
       const res = await fetch('https://api.brevo.com/v3/account', { headers: { 'api-key': BREVO_API_KEY, accept: 'application/json' }, signal: AbortSignal.timeout(10000) });
-      console.log(res.ok ? `[mail] Brevo API ready · sending as ${sender.email}` : `[mail] Brevo API key rejected (${res.status}) — check BREVO_API_KEY`);
+      if (res.ok) console.log(`[mail] Brevo API ready · sending as ${sender.email}`);
+      else {
+        const body = (await res.text().catch(() => '')).slice(0, 300);
+        const kind = BREVO_API_KEY.startsWith('xkeysib-') ? 'API key (xkeysib-…)'
+          : BREVO_API_KEY.startsWith('xsmtpsib-') ? 'SMTP key (xsmtpsib-…) — this is the wrong kind; generate an API key instead'
+          : 'unrecognised format — Brevo API keys start with xkeysib-';
+        console.log(`[mail] Brevo API key rejected (${res.status}) · key looks like: ${kind} · length ${BREVO_API_KEY.length} · Brevo says: ${body}`);
+      }
     } catch (e) { console.log('[mail] cannot reach Brevo API:', e.message); }
   } else if (useSmtp) {
     try { await transport.verify(); console.log(`[mail] SMTP ready (${SMTP_HOST}:${SMTP_PORT || 587}) · sending as ${MAIL_FROM || SMTP_USER}`); } catch (e) {
